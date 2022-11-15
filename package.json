@@ -1,6 +1,8 @@
 {
   "scripts": {
-    "compile": "hardhat compile"
+    "compile": "hardhat compile",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix ."
   },
   "devDependencies": {
     "@ethersproject/providers": "^5.4.7",
@@ -14,6 +16,9 @@
     "@types/chai": "^4.2.0",
     "@types/mocha": "^9.1.0",
     "chai": "^4.2.0",
+    "eslint": "^8.27.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-prettier": "^4.2.1",
     "ethers": "^5.4.7",
     "hardhat": "^2.12.2",
     "hardhat-gas-reporter": "^1.0.8",

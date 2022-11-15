@@ -20,9 +20,9 @@ contract Aggregator is ReentrancyGuard, Ownable, Pausable {
 	}
 
     // taskId => DepositInfo
-	mapping(bytes32 => DepositInfo) public _depositRecords;
-	// workerAddress => taskId[]
-	mapping(address => bytes32[]) public _activedTasks;
+    mapping(bytes32 => DepositInfo) public _depositRecords;
+    // workerAddress => taskId[]
+    mapping(address => bytes32[]) public _activedTasks;
 
     mapping(address => bool) private _executors;
 
