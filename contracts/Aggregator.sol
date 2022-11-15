@@ -17,7 +17,7 @@ contract Aggregator is ReentrancyGuard, Ownable, Pausable {
         bytes    recipient;
         // Encoded execution plan produced by Solver
         bytes    task;
-	}
+    }
 
     // taskId => DepositInfo
     mapping(bytes32 => DepositInfo) public _depositRecords;
@@ -44,28 +44,28 @@ contract Aggregator is ReentrancyGuard, Ownable, Pausable {
     }
 
     // Temporary transfer asset to contract and save the corresponding task data
-	function deposit(
-		address token,
-		uint256 amount,
-		uint256 recipientLen,
-		bytes memory recipient,
-		bytes32 taskId,
-		uint256 taskLen,
-		bytes memory task
-	) external whenNotPaused nonReentrant {
+    function deposit(
+        address token,
+        uint256 amount,
+        uint256 recipientLen,
+        bytes memory recipient,
+        bytes32 taskId,
+        uint256 taskLen,
+        bytes memory task
+    ) external whenNotPaused nonReentrant {
 
-		// Transfer from sender to contract
+        // Transfer from sender to contract
         // bool ret = ERC20(token).transferFrom(msg.sender, address(this), amount);
 
     }
 
-	// Executor claims asset to worker account and consumes a pending task
-	function claim(bytes32 taskId, address worker) external whenNotPaused onlyExecutor nonReentrant {
-		// Transfer asset to worker account
+    // Executor claims asset to worker account and consumes a pending task
+    function claim(bytes32 taskId, address worker) external whenNotPaused onlyExecutor nonReentrant {
+        // Transfer asset to worker account
 
         // Remove `DepositInfo` from records
 
-	}
+    }
 
     function getActivedTasks(address worker) public view returns (bytes32[] memory) {
         return _activedTasks[worker];
