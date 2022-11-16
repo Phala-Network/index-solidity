@@ -12,9 +12,7 @@ async function main() {
 
   await aggregator.deployed()
 
-  console.log(
-    `Aggregator deployed to ${aggregator.address}`
-  )
+  console.log(`Aggregator deployed to ${aggregator.address}`)
 }
 
 // We recommend this pattern to be able to use async/await everywhere
