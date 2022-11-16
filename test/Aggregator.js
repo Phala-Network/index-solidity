@@ -1,6 +1,7 @@
 const {time, loadFixture} = require('@nomicfoundation/hardhat-network-helpers')
 const {anyValue} = require('@nomicfoundation/hardhat-chai-matchers/withArgs')
 const {expect} = require('chai')
+const {ethers} = require('hardhat')
 
 describe('Aggregator', function () {
   // We define a fixture to reuse the same setup in every test.
@@ -125,6 +126,94 @@ describe('Aggregator', function () {
           '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
           '0x1234'
         )
+    })
+
+    it('Should revert if task is already exist', async function () {
+      const {token, aggregator, user} = await loadFixture(
+        deployAggregatorFixture
+      )
+
+      // User approve to aggregator
+      token.connect(user).approve(aggregator.address, '10000')
+
+      await expect(
+        aggregator
+          .connect(user)
+          .deposit(
+            token.address,
+            '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+            '0x1234'
+          )
+      )
+        .to.emit(aggregator, 'Deposited')
+        .withArgs(
+          user.address,
+          token.address,
+          '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+          '0x1234'
+        )
+
+      await expect(
+        aggregator
+          .connect(user)
+          .deposit(
+            token.address,
+            '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+            '0x1234'
+          )
+      ).to.be.revertedWith('Duplicate task')
+    })
+
+    it('Should revert if task is already exist', async function () {
+      const {token, aggregator, user} = await loadFixture(
+        deployAggregatorFixture
+      )
+
+      // User approve to aggregator
+      token.connect(user).approve(aggregator.address, '10000')
+
+      for (let i = 0; i < 10; i++) {
+        await expect(
+          aggregator
+            .connect(user)
+            .deposit(
+              token.address,
+              '100',
+              '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+              '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+              ethers.utils.hexZeroPad(i, 32),
+              '0x1234'
+            )
+        )
+          .to.emit(aggregator, 'Deposited')
+          .withArgs(
+            user.address,
+            token.address,
+            '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+            '0x1234'
+          )
+      }
+
+      await expect(
+        aggregator
+          .connect(user)
+          .deposit(
+            token.address,
+            '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+            '0x0000000000000000000000000000000000000000000000000000000000000010',
+            '0x1234'
+          )
+      ).to.be.revertedWith('Too many tasks')
     })
   })
 })
