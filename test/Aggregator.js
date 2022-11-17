@@ -171,7 +171,7 @@ describe('Aggregator', function () {
       ).to.be.revertedWith('Duplicate task')
     })
 
-    it('Should revert if task is already exist', async function () {
+    it('Should revert if task count exceeds limit', async function () {
       const {token, aggregator, user} = await loadFixture(
         deployAggregatorFixture
       )

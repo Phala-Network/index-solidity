@@ -33,15 +33,21 @@ contract Aggregator is ReentrancyGuard, Ownable, Pausable {
     mapping(bytes32 => DepositInfo) public _depositRecords;
     // workerAddress => taskId[]
     mapping(address => bytes32[]) public _activedTasks;
-
+    // executorAddress => isExecutor
     mapping(address => bool) private _executors;
 
     event Deposited(
         address  indexed sender,
-        IERC20   indexed token,
+        address  indexed token,
         uint256  amount,
         bytes    recipient,
         bytes    task
+    );
+
+    event Claimed(
+        address   indexed executor,
+        address   indexed worker,
+        bytes32 indexed taskId
     );
 
     modifier onlyExecutor {
@@ -95,15 +101,31 @@ contract Aggregator is ReentrancyGuard, Ownable, Pausable {
             recipient: recipient,
             task: task
         });
-        emit Deposited(msg.sender, IERC20(token), amount, recipient, task);
+        emit Deposited(msg.sender, token, amount, recipient, task);
     }
 
-    // Executor claims asset to worker account and consumes a pending task
-    function claim(bytes32 taskId, address worker) external whenNotPaused onlyExecutor nonReentrant {
-        // Transfer asset to worker account
+    // Executor claim all actived tasks
+    function claim(address worker) external whenNotPaused onlyExecutor nonReentrant {
+        require(worker != address(0), "Illegal worker address");
+        bytes32[] memory tasks = _activedTasks[worker];
+        for (uint i = 0; i < tasks.length; i++) {
+            DepositInfo memory depositInfo = _depositRecords[tasks[i]];
+            require(
+                depositInfo.token.balanceOf(address(this))
+                >= depositInfo.amount,
+            "Insufficient balance");
+            // Transfer asset to worker account
+            depositInfo.token.safeTransfer(worker, depositInfo.amount);
 
-        // Remove `DepositInfo` from records
+            emit Claimed(
+                msg.sender,
+                worker,
+                tasks[i]
+            );
+        }
 
+        // Clear actived tasks list
+        delete _activedTasks[worker];
     }
 
     function getActivedTasks(address worker) public view returns (bytes32[] memory) {
