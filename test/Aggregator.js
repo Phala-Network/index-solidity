@@ -9,7 +9,7 @@ describe('Aggregator', function () {
   // and reset Hardhat Network to that snapshot in every test.
   async function deployAggregatorFixture() {
     // Contracts are deployed using the first signer/account by default
-    const [owner, user] = await ethers.getSigners()
+    const [owner, executor, user] = await ethers.getSigners()
 
     const Token = await ethers.getContractFactory('ERC20PresetMinterPauser')
     const token = await Token.deploy('TestToken', 'TT')
@@ -19,7 +19,7 @@ describe('Aggregator', function () {
     // transfer some token to test account
     await token.mint(owner.address, '10000')
     await token.mint(user.address, '10000')
-    return {token, aggregator, owner, user}
+    return {token, aggregator, owner, executor, user}
   }
 
   describe('Deposit', function () {
@@ -98,7 +98,7 @@ describe('Aggregator', function () {
       ).to.be.revertedWith('Illegal task data')
     })
 
-    it('Should work', async function () {
+    it('Deposit should work', async function () {
       const {token, aggregator, user} = await loadFixture(
         deployAggregatorFixture
       )
@@ -214,6 +214,195 @@ describe('Aggregator', function () {
             '0x1234'
           )
       ).to.be.revertedWith('Too many tasks')
+    })
+  })
+
+  describe('Claim', function () {
+    it('Should revert if sender is not executor', async function () {
+      const {token, aggregator, executor, user} = await loadFixture(
+        deployAggregatorFixture
+      )
+
+      // Set executor
+      await aggregator.setExecutor(executor.address)
+      // User approve to aggregator
+      token.connect(user).approve(aggregator.address, '10000')
+
+      await expect(
+        aggregator
+          .connect(user)
+          .deposit(
+            token.address,
+            '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+            '0x1234'
+          )
+      )
+        .to.emit(aggregator, 'Deposited')
+        .withArgs(
+          user.address,
+          token.address,
+          '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+          '0x1234'
+        )
+
+      await expect(
+        aggregator
+          .connect(user)
+          .claim('0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8')
+      ).to.be.revertedWith('Not executor')
+    })
+
+    it('Should revert if worker is zero address', async function () {
+      const {token, aggregator, executor, user} = await loadFixture(
+        deployAggregatorFixture
+      )
+      // Set executor
+      await aggregator.setExecutor(executor.address)
+      // User approve to aggregator
+      token.connect(user).approve(aggregator.address, '10000')
+
+      await expect(
+        aggregator
+          .connect(user)
+          .deposit(
+            token.address,
+            '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+            '0x1234'
+          )
+      )
+        .to.emit(aggregator, 'Deposited')
+        .withArgs(
+          user.address,
+          token.address,
+          '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+          '0x1234'
+        )
+
+      await expect(
+        aggregator
+          .connect(executor)
+          .claim('0x0000000000000000000000000000000000000000')
+      ).to.be.revertedWith('Illegal worker address')
+    })
+
+    it('Claim should work', async function () {
+      const {token, aggregator, executor, user} = await loadFixture(
+        deployAggregatorFixture
+      )
+      // Set executor
+      await aggregator.setExecutor(executor.address)
+      // User approve to aggregator
+      token.connect(user).approve(aggregator.address, '10000')
+
+      await expect(
+        aggregator
+          .connect(user)
+          .deposit(
+            token.address,
+            '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+            '0x1234'
+          )
+      )
+        .to.emit(aggregator, 'Deposited')
+        .withArgs(
+          user.address,
+          token.address,
+          '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+          '0x1234'
+        )
+
+      expect(
+        (
+          await aggregator.getActivedTasks(
+            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8'
+          )
+        )[0]
+      ).to.equal(
+        '0x0000000000000000000000000000000000000000000000000000000000000001'
+      )
+
+      await expect(
+        aggregator
+          .connect(executor)
+          .claim('0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8')
+      )
+        .to.emit(aggregator, 'Claimed')
+        .withArgs(
+          executor.address,
+          '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+          '0x0000000000000000000000000000000000000000000000000000000000000001'
+        )
+      expect(
+        (
+          await aggregator.getActivedTasks(
+            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8'
+          )
+        ).length
+      ).to.equal(0)
+    })
+
+    it('Claim multiple tasks should work', async function () {
+      const {token, aggregator, executor, user} = await loadFixture(
+        deployAggregatorFixture
+      )
+      // Set executor
+      await aggregator.setExecutor(executor.address)
+      // User approve to aggregator
+      token.connect(user).approve(aggregator.address, '10000')
+
+      for (let i = 0; i < 10; i++) {
+        await expect(
+          aggregator
+            .connect(user)
+            .deposit(
+              token.address,
+              '100',
+              '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+              '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+              ethers.utils.hexZeroPad(i, 32),
+              '0x1234'
+            )
+        )
+          .to.emit(aggregator, 'Deposited')
+          .withArgs(
+            user.address,
+            token.address,
+            '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+            '0x1234'
+          )
+      }
+
+      expect(
+        (
+          await aggregator.getActivedTasks(
+            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8'
+          )
+        ).length
+      ).to.equal(10)
+
+      await aggregator
+        .connect(executor)
+        .claim('0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8')
+      expect(
+        (
+          await aggregator.getActivedTasks(
+            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8'
+          )
+        ).length
+      ).to.equal(0)
     })
   })
 })
