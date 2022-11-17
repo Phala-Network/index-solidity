@@ -51,7 +51,7 @@ contract Aggregator is ReentrancyGuard, Ownable, Pausable {
     );
 
     modifier onlyExecutor {
-        require(_executors[_msgSender()], "NotExecutor");
+        require(_executors[_msgSender()], "Not executor");
         _;
     }
 
@@ -59,11 +59,11 @@ contract Aggregator is ReentrancyGuard, Ownable, Pausable {
 
     }
 
-    function set_executor(address executor) external onlyOwner {
+    function setExecutor(address executor) external onlyOwner {
         _executors[executor] = true;
     }
 
-    function remove_executor(address executor) external onlyOwner {
+    function removeExecutor(address executor) external onlyOwner {
         _executors[executor] = false;
     }
 
