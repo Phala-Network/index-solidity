@@ -34,7 +34,7 @@ contract Aggregator is ReentrancyGuard, Ownable, Pausable {
     // workerAddress => taskId[]
     mapping(address => bytes32[]) public _activedTasks;
     // executorAddress => isExecutor
-    mapping(address => bool) private _executors;
+    mapping(address => bool) public _executors;
 
     event Deposited(
         address  indexed sender,
