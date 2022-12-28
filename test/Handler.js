@@ -93,7 +93,7 @@ describe('Handler', function () {
           '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
           worker.address,
           '0x0000000000000000000000000000000000000000000000000000000000000001',
-          '0x'
+          ''
         )
       ).to.be.revertedWith('Illegal request data')
     })
