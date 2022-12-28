@@ -9,7 +9,7 @@ describe('Handler', function () {
   // and reset Hardhat Network to that snapshot in every test.
   async function deployHandlerFixture() {
     // Contracts are deployed using the first signer/account by default
-    const [owner, executor, user] = await ethers.getSigners()
+    const [owner, worker, user] = await ethers.getSigners()
 
     const Token = await ethers.getContractFactory('ERC20PresetMinterPauser')
     const token = await Token.deploy('TestToken', 'TT')
@@ -19,19 +19,19 @@ describe('Handler', function () {
     // transfer some token to test account
     await token.mint(owner.address, '10000')
     await token.mint(user.address, '10000')
-    return {token, handler, owner, executor, user}
+    return {token, handler, owner, worker, user}
   }
 
   describe('Deposit', function () {
     it('Should revert if token address is 0', async function () {
-      const {handler} = await loadFixture(deployHandlerFixture)
+      const {handler, worker} = await loadFixture(deployHandlerFixture)
 
       await expect(
         handler.deposit(
           '0x0000000000000000000000000000000000000000',
           '100',
           '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-          '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+          worker.address,
           '0x0000000000000000000000000000000000000000000000000000000000000001',
           '0x1234'
         )
@@ -39,14 +39,14 @@ describe('Handler', function () {
     })
 
     it('Should revert if transfer amount is 0', async function () {
-      const {handler} = await loadFixture(deployHandlerFixture)
+      const {handler, worker} = await loadFixture(deployHandlerFixture)
 
       await expect(
         handler.deposit(
           '0x0000000000000000000000000000000000000001',
           '0',
           '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-          '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+          worker.address,
           '0x0000000000000000000000000000000000000000000000000000000000000001',
           '0x1234'
         )
@@ -54,14 +54,14 @@ describe('Handler', function () {
     })
 
     it('Should revert if recipient is empty', async function () {
-      const {handler} = await loadFixture(deployHandlerFixture)
+      const {handler, worker} = await loadFixture(deployHandlerFixture)
 
       await expect(
         handler.deposit(
           '0x0000000000000000000000000000000000000001',
           '100',
           '0x',
-          '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+          worker.address,
           '0x0000000000000000000000000000000000000000000000000000000000000001',
           '0x1234'
         )
@@ -84,14 +84,14 @@ describe('Handler', function () {
     })
 
     it('Should revert if task data is empty', async function () {
-      const {handler} = await loadFixture(deployHandlerFixture)
+      const {handler, worker} = await loadFixture(deployHandlerFixture)
 
       await expect(
         handler.deposit(
           '0x0000000000000000000000000000000000000001',
           '100',
           '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-          '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+          worker.address,
           '0x0000000000000000000000000000000000000000000000000000000000000001',
           '0x'
         )
@@ -99,7 +99,9 @@ describe('Handler', function () {
     })
 
     it('Deposit should work', async function () {
-      const {token, handler, user} = await loadFixture(deployHandlerFixture)
+      const {token, handler, worker, user} = await loadFixture(
+        deployHandlerFixture
+      )
 
       // User approve to handler
       token.connect(user).approve(handler.address, '10000')
@@ -111,7 +113,7 @@ describe('Handler', function () {
             token.address,
             '100',
             '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+            worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
             '0x1234'
           )
@@ -127,7 +129,9 @@ describe('Handler', function () {
     })
 
     it('Should revert if task is already exist', async function () {
-      const {token, handler, user} = await loadFixture(deployHandlerFixture)
+      const {token, handler, worker, user} = await loadFixture(
+        deployHandlerFixture
+      )
 
       // User approve to handler
       token.connect(user).approve(handler.address, '10000')
@@ -139,7 +143,7 @@ describe('Handler', function () {
             token.address,
             '100',
             '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+            worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
             '0x1234'
           )
@@ -160,7 +164,7 @@ describe('Handler', function () {
             token.address,
             '100',
             '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+            worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
             '0x1234'
           )
@@ -168,7 +172,9 @@ describe('Handler', function () {
     })
 
     it('Should revert if task count exceeds limit', async function () {
-      const {token, handler, user} = await loadFixture(deployHandlerFixture)
+      const {token, handler, worker, user} = await loadFixture(
+        deployHandlerFixture
+      )
 
       // User approve to handler
       token.connect(user).approve(handler.address, '10000')
@@ -181,7 +187,7 @@ describe('Handler', function () {
               token.address,
               '100',
               '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-              '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+              worker.address,
               ethers.utils.hexZeroPad(i, 32),
               '0x1234'
             )
@@ -203,7 +209,7 @@ describe('Handler', function () {
             token.address,
             '100',
             '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+            worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000010',
             '0x1234'
           )
@@ -212,13 +218,13 @@ describe('Handler', function () {
   })
 
   describe('Claim', function () {
-    it('Should revert if sender is not executor', async function () {
-      const {token, handler, executor, user} = await loadFixture(
+    it('Should revert if sender is not worker', async function () {
+      const {token, handler, worker, user} = await loadFixture(
         deployHandlerFixture
       )
 
-      // Set executor
-      await handler.setExecutor(executor.address)
+      // Set worker
+      await handler.setWorker(worker.address)
       // User approve to handler
       token.connect(user).approve(handler.address, '10000')
 
@@ -229,7 +235,7 @@ describe('Handler', function () {
             token.address,
             '100',
             '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+            worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
             '0x1234'
           )
@@ -243,19 +249,17 @@ describe('Handler', function () {
           '0x1234'
         )
 
-      await expect(
-        handler
-          .connect(user)
-          .claim('0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8')
-      ).to.be.revertedWith('Not executor')
+      await expect(handler.connect(user).claim()).to.be.revertedWith(
+        'Not worker'
+      )
     })
 
-    it('Should revert if worker is zero address', async function () {
-      const {token, handler, executor, user} = await loadFixture(
+    it('Claim last task should work', async function () {
+      const {token, handler, worker, user} = await loadFixture(
         deployHandlerFixture
       )
-      // Set executor
-      await handler.setExecutor(executor.address)
+      // Set worker
+      await handler.setWorker(worker.address)
       // User approve to handler
       token.connect(user).approve(handler.address, '10000')
 
@@ -266,7 +270,7 @@ describe('Handler', function () {
             token.address,
             '100',
             '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+            worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
             '0x1234'
           )
@@ -280,79 +284,27 @@ describe('Handler', function () {
           '0x1234'
         )
 
-      await expect(
-        handler
-          .connect(executor)
-          .claim('0x0000000000000000000000000000000000000000')
-      ).to.be.revertedWith('Illegal worker address')
-    })
-
-    it('Claim should work', async function () {
-      const {token, handler, executor, user} = await loadFixture(
-        deployHandlerFixture
-      )
-      // Set executor
-      await handler.setExecutor(executor.address)
-      // User approve to handler
-      token.connect(user).approve(handler.address, '10000')
-
-      await expect(
-        handler
-          .connect(user)
-          .deposit(
-            token.address,
-            '100',
-            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
-            '0x0000000000000000000000000000000000000000000000000000000000000001',
-            '0x1234'
-          )
-      )
-        .to.emit(handler, 'Deposited')
-        .withArgs(
-          user.address,
-          token.address,
-          '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-          '0x1234'
-        )
-
-      expect(
-        (
-          await handler.getActivedTasks(
-            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8'
-          )
-        )[0]
-      ).to.equal(
+      expect(await handler.getLastActivedTask(worker.address)).to.equal(
         '0x0000000000000000000000000000000000000000000000000000000000000001'
       )
 
-      await expect(
-        handler
-          .connect(executor)
-          .claim('0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8')
-      )
+      await expect(handler.connect(worker).claim())
         .to.emit(handler, 'Claimed')
         .withArgs(
-          executor.address,
-          '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+          worker.address,
           '0x0000000000000000000000000000000000000000000000000000000000000001'
         )
-      expect(
-        (
-          await handler.getActivedTasks(
-            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8'
-          )
-        ).length
-      ).to.equal(0)
+      expect(await handler.getLastActivedTask(worker.address)).to.equal(
+        '0x0000000000000000000000000000000000000000000000000000000000000000'
+      )
     })
 
     it('Claim multiple tasks should work', async function () {
-      const {token, handler, executor, user} = await loadFixture(
+      const {token, handler, worker, user} = await loadFixture(
         deployHandlerFixture
       )
-      // Set executor
-      await handler.setExecutor(executor.address)
+      // Set worker
+      await handler.setWorker(worker.address)
       // User approve to handler
       token.connect(user).approve(handler.address, '10000')
 
@@ -364,7 +316,7 @@ describe('Handler', function () {
               token.address,
               '100',
               '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-              '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
+              worker.address,
               ethers.utils.hexZeroPad(i, 32),
               '0x1234'
             )
@@ -379,24 +331,12 @@ describe('Handler', function () {
           )
       }
 
-      expect(
-        (
-          await handler.getActivedTasks(
-            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8'
-          )
-        ).length
-      ).to.equal(10)
+      expect((await handler.getActivedTasks(worker.address)).length).to.equal(
+        10
+      )
 
-      await handler
-        .connect(executor)
-        .claim('0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8')
-      expect(
-        (
-          await handler.getActivedTasks(
-            '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8'
-          )
-        ).length
-      ).to.equal(0)
+      await handler.connect(worker).claim_all()
+      expect((await handler.getActivedTasks(worker.address)).length).to.equal(0)
     })
   })
 })
