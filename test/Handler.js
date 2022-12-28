@@ -83,7 +83,7 @@ describe('Handler', function () {
       ).to.be.revertedWith('Illegal worker address')
     })
 
-    it('Should revert if task data is empty', async function () {
+    it('Should revert if request data is empty', async function () {
       const {handler, worker} = await loadFixture(deployHandlerFixture)
 
       await expect(
@@ -95,7 +95,7 @@ describe('Handler', function () {
           '0x0000000000000000000000000000000000000000000000000000000000000001',
           '0x'
         )
-      ).to.be.revertedWith('Illegal task data')
+      ).to.be.revertedWith('Illegal request data')
     })
 
     it('Deposit should work', async function () {
@@ -128,7 +128,7 @@ describe('Handler', function () {
         )
     })
 
-    it('Should revert if task is already exist', async function () {
+    it('Should revert if request is already exist', async function () {
       const {token, handler, worker, user} = await loadFixture(
         deployHandlerFixture
       )
@@ -168,10 +168,10 @@ describe('Handler', function () {
             '0x0000000000000000000000000000000000000000000000000000000000000001',
             '0x1234'
           )
-      ).to.be.revertedWith('Duplicate task')
+      ).to.be.revertedWith('Duplicate request')
     })
 
-    it('Should revert if task count exceeds limit', async function () {
+    it('Should revert if request count exceeds limit', async function () {
       const {token, handler, worker, user} = await loadFixture(
         deployHandlerFixture
       )
@@ -213,7 +213,7 @@ describe('Handler', function () {
             '0x0000000000000000000000000000000000000000000000000000000000000010',
             '0x1234'
           )
-      ).to.be.revertedWith('Too many tasks')
+      ).to.be.revertedWith('Too many requests')
     })
   })
 
@@ -254,7 +254,7 @@ describe('Handler', function () {
       )
     })
 
-    it('Claim last task should work', async function () {
+    it('Claim last request should work', async function () {
       const {token, handler, worker, user} = await loadFixture(
         deployHandlerFixture
       )
@@ -284,7 +284,7 @@ describe('Handler', function () {
           '0x1234'
         )
 
-      expect(await handler.getLastActivedTask(worker.address)).to.equal(
+      expect(await handler.getLastActivedRequest(worker.address)).to.equal(
         '0x0000000000000000000000000000000000000000000000000000000000000001'
       )
 
@@ -294,12 +294,12 @@ describe('Handler', function () {
           worker.address,
           '0x0000000000000000000000000000000000000000000000000000000000000001'
         )
-      expect(await handler.getLastActivedTask(worker.address)).to.equal(
+      expect(await handler.getLastActivedRequest(worker.address)).to.equal(
         '0x0000000000000000000000000000000000000000000000000000000000000000'
       )
     })
 
-    it('Claim multiple tasks should work', async function () {
+    it('Claim multiple requests should work', async function () {
       const {token, handler, worker, user} = await loadFixture(
         deployHandlerFixture
       )
@@ -331,12 +331,14 @@ describe('Handler', function () {
           )
       }
 
-      expect((await handler.getActivedTasks(worker.address)).length).to.equal(
-        10
-      )
+      expect(
+        (await handler.getActivedRequests(worker.address)).length
+      ).to.equal(10)
 
       await handler.connect(worker).claim_all()
-      expect((await handler.getActivedTasks(worker.address)).length).to.equal(0)
+      expect(
+        (await handler.getActivedRequests(worker.address)).length
+      ).to.equal(0)
     })
   })
 })
