@@ -3,31 +3,31 @@ const {anyValue} = require('@nomicfoundation/hardhat-chai-matchers/withArgs')
 const {expect} = require('chai')
 const {ethers} = require('hardhat')
 
-describe('Aggregator', function () {
+describe('Handler', function () {
   // We define a fixture to reuse the same setup in every test.
   // We use loadFixture to run this setup once, snapshot that state,
   // and reset Hardhat Network to that snapshot in every test.
-  async function deployAggregatorFixture() {
+  async function deployHandlerFixture() {
     // Contracts are deployed using the first signer/account by default
     const [owner, executor, user] = await ethers.getSigners()
 
     const Token = await ethers.getContractFactory('ERC20PresetMinterPauser')
     const token = await Token.deploy('TestToken', 'TT')
-    const Aggregator = await ethers.getContractFactory('Aggregator')
-    const aggregator = await Aggregator.deploy()
+    const Handler = await ethers.getContractFactory('Handler')
+    const handler = await Handler.deploy()
 
     // transfer some token to test account
     await token.mint(owner.address, '10000')
     await token.mint(user.address, '10000')
-    return {token, aggregator, owner, executor, user}
+    return {token, handler, owner, executor, user}
   }
 
   describe('Deposit', function () {
     it('Should revert if token address is 0', async function () {
-      const {aggregator} = await loadFixture(deployAggregatorFixture)
+      const {handler} = await loadFixture(deployHandlerFixture)
 
       await expect(
-        aggregator.deposit(
+        handler.deposit(
           '0x0000000000000000000000000000000000000000',
           '100',
           '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
@@ -39,10 +39,10 @@ describe('Aggregator', function () {
     })
 
     it('Should revert if transfer amount is 0', async function () {
-      const {aggregator} = await loadFixture(deployAggregatorFixture)
+      const {handler} = await loadFixture(deployHandlerFixture)
 
       await expect(
-        aggregator.deposit(
+        handler.deposit(
           '0x0000000000000000000000000000000000000001',
           '0',
           '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
@@ -54,10 +54,10 @@ describe('Aggregator', function () {
     })
 
     it('Should revert if recipient is empty', async function () {
-      const {aggregator} = await loadFixture(deployAggregatorFixture)
+      const {handler} = await loadFixture(deployHandlerFixture)
 
       await expect(
-        aggregator.deposit(
+        handler.deposit(
           '0x0000000000000000000000000000000000000001',
           '100',
           '0x',
@@ -69,10 +69,10 @@ describe('Aggregator', function () {
     })
 
     it('Should revert if worker address is 0', async function () {
-      const {aggregator} = await loadFixture(deployAggregatorFixture)
+      const {handler} = await loadFixture(deployHandlerFixture)
 
       await expect(
-        aggregator.deposit(
+        handler.deposit(
           '0x0000000000000000000000000000000000000001',
           '100',
           '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
@@ -84,10 +84,10 @@ describe('Aggregator', function () {
     })
 
     it('Should revert if task data is empty', async function () {
-      const {aggregator} = await loadFixture(deployAggregatorFixture)
+      const {handler} = await loadFixture(deployHandlerFixture)
 
       await expect(
-        aggregator.deposit(
+        handler.deposit(
           '0x0000000000000000000000000000000000000001',
           '100',
           '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
@@ -99,15 +99,13 @@ describe('Aggregator', function () {
     })
 
     it('Deposit should work', async function () {
-      const {token, aggregator, user} = await loadFixture(
-        deployAggregatorFixture
-      )
+      const {token, handler, user} = await loadFixture(deployHandlerFixture)
 
-      // User approve to aggregator
-      token.connect(user).approve(aggregator.address, '10000')
+      // User approve to handler
+      token.connect(user).approve(handler.address, '10000')
 
       await expect(
-        aggregator
+        handler
           .connect(user)
           .deposit(
             token.address,
@@ -118,7 +116,7 @@ describe('Aggregator', function () {
             '0x1234'
           )
       )
-        .to.emit(aggregator, 'Deposited')
+        .to.emit(handler, 'Deposited')
         .withArgs(
           user.address,
           token.address,
@@ -129,15 +127,13 @@ describe('Aggregator', function () {
     })
 
     it('Should revert if task is already exist', async function () {
-      const {token, aggregator, user} = await loadFixture(
-        deployAggregatorFixture
-      )
+      const {token, handler, user} = await loadFixture(deployHandlerFixture)
 
-      // User approve to aggregator
-      token.connect(user).approve(aggregator.address, '10000')
+      // User approve to handler
+      token.connect(user).approve(handler.address, '10000')
 
       await expect(
-        aggregator
+        handler
           .connect(user)
           .deposit(
             token.address,
@@ -148,7 +144,7 @@ describe('Aggregator', function () {
             '0x1234'
           )
       )
-        .to.emit(aggregator, 'Deposited')
+        .to.emit(handler, 'Deposited')
         .withArgs(
           user.address,
           token.address,
@@ -158,7 +154,7 @@ describe('Aggregator', function () {
         )
 
       await expect(
-        aggregator
+        handler
           .connect(user)
           .deposit(
             token.address,
@@ -172,16 +168,14 @@ describe('Aggregator', function () {
     })
 
     it('Should revert if task count exceeds limit', async function () {
-      const {token, aggregator, user} = await loadFixture(
-        deployAggregatorFixture
-      )
+      const {token, handler, user} = await loadFixture(deployHandlerFixture)
 
-      // User approve to aggregator
-      token.connect(user).approve(aggregator.address, '10000')
+      // User approve to handler
+      token.connect(user).approve(handler.address, '10000')
 
       for (let i = 0; i < 10; i++) {
         await expect(
-          aggregator
+          handler
             .connect(user)
             .deposit(
               token.address,
@@ -192,7 +186,7 @@ describe('Aggregator', function () {
               '0x1234'
             )
         )
-          .to.emit(aggregator, 'Deposited')
+          .to.emit(handler, 'Deposited')
           .withArgs(
             user.address,
             token.address,
@@ -203,7 +197,7 @@ describe('Aggregator', function () {
       }
 
       await expect(
-        aggregator
+        handler
           .connect(user)
           .deposit(
             token.address,
@@ -219,17 +213,17 @@ describe('Aggregator', function () {
 
   describe('Claim', function () {
     it('Should revert if sender is not executor', async function () {
-      const {token, aggregator, executor, user} = await loadFixture(
-        deployAggregatorFixture
+      const {token, handler, executor, user} = await loadFixture(
+        deployHandlerFixture
       )
 
       // Set executor
-      await aggregator.setExecutor(executor.address)
-      // User approve to aggregator
-      token.connect(user).approve(aggregator.address, '10000')
+      await handler.setExecutor(executor.address)
+      // User approve to handler
+      token.connect(user).approve(handler.address, '10000')
 
       await expect(
-        aggregator
+        handler
           .connect(user)
           .deposit(
             token.address,
@@ -240,7 +234,7 @@ describe('Aggregator', function () {
             '0x1234'
           )
       )
-        .to.emit(aggregator, 'Deposited')
+        .to.emit(handler, 'Deposited')
         .withArgs(
           user.address,
           token.address,
@@ -250,23 +244,23 @@ describe('Aggregator', function () {
         )
 
       await expect(
-        aggregator
+        handler
           .connect(user)
           .claim('0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8')
       ).to.be.revertedWith('Not executor')
     })
 
     it('Should revert if worker is zero address', async function () {
-      const {token, aggregator, executor, user} = await loadFixture(
-        deployAggregatorFixture
+      const {token, handler, executor, user} = await loadFixture(
+        deployHandlerFixture
       )
       // Set executor
-      await aggregator.setExecutor(executor.address)
-      // User approve to aggregator
-      token.connect(user).approve(aggregator.address, '10000')
+      await handler.setExecutor(executor.address)
+      // User approve to handler
+      token.connect(user).approve(handler.address, '10000')
 
       await expect(
-        aggregator
+        handler
           .connect(user)
           .deposit(
             token.address,
@@ -277,7 +271,7 @@ describe('Aggregator', function () {
             '0x1234'
           )
       )
-        .to.emit(aggregator, 'Deposited')
+        .to.emit(handler, 'Deposited')
         .withArgs(
           user.address,
           token.address,
@@ -287,23 +281,23 @@ describe('Aggregator', function () {
         )
 
       await expect(
-        aggregator
+        handler
           .connect(executor)
           .claim('0x0000000000000000000000000000000000000000')
       ).to.be.revertedWith('Illegal worker address')
     })
 
     it('Claim should work', async function () {
-      const {token, aggregator, executor, user} = await loadFixture(
-        deployAggregatorFixture
+      const {token, handler, executor, user} = await loadFixture(
+        deployHandlerFixture
       )
       // Set executor
-      await aggregator.setExecutor(executor.address)
-      // User approve to aggregator
-      token.connect(user).approve(aggregator.address, '10000')
+      await handler.setExecutor(executor.address)
+      // User approve to handler
+      token.connect(user).approve(handler.address, '10000')
 
       await expect(
-        aggregator
+        handler
           .connect(user)
           .deposit(
             token.address,
@@ -314,7 +308,7 @@ describe('Aggregator', function () {
             '0x1234'
           )
       )
-        .to.emit(aggregator, 'Deposited')
+        .to.emit(handler, 'Deposited')
         .withArgs(
           user.address,
           token.address,
@@ -325,7 +319,7 @@ describe('Aggregator', function () {
 
       expect(
         (
-          await aggregator.getActivedTasks(
+          await handler.getActivedTasks(
             '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8'
           )
         )[0]
@@ -334,11 +328,11 @@ describe('Aggregator', function () {
       )
 
       await expect(
-        aggregator
+        handler
           .connect(executor)
           .claim('0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8')
       )
-        .to.emit(aggregator, 'Claimed')
+        .to.emit(handler, 'Claimed')
         .withArgs(
           executor.address,
           '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8',
@@ -346,7 +340,7 @@ describe('Aggregator', function () {
         )
       expect(
         (
-          await aggregator.getActivedTasks(
+          await handler.getActivedTasks(
             '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8'
           )
         ).length
@@ -354,17 +348,17 @@ describe('Aggregator', function () {
     })
 
     it('Claim multiple tasks should work', async function () {
-      const {token, aggregator, executor, user} = await loadFixture(
-        deployAggregatorFixture
+      const {token, handler, executor, user} = await loadFixture(
+        deployHandlerFixture
       )
       // Set executor
-      await aggregator.setExecutor(executor.address)
-      // User approve to aggregator
-      token.connect(user).approve(aggregator.address, '10000')
+      await handler.setExecutor(executor.address)
+      // User approve to handler
+      token.connect(user).approve(handler.address, '10000')
 
       for (let i = 0; i < 10; i++) {
         await expect(
-          aggregator
+          handler
             .connect(user)
             .deposit(
               token.address,
@@ -375,7 +369,7 @@ describe('Aggregator', function () {
               '0x1234'
             )
         )
-          .to.emit(aggregator, 'Deposited')
+          .to.emit(handler, 'Deposited')
           .withArgs(
             user.address,
             token.address,
@@ -387,18 +381,18 @@ describe('Aggregator', function () {
 
       expect(
         (
-          await aggregator.getActivedTasks(
+          await handler.getActivedTasks(
             '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8'
           )
         ).length
       ).to.equal(10)
 
-      await aggregator
+      await handler
         .connect(executor)
         .claim('0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8')
       expect(
         (
-          await aggregator.getActivedTasks(
+          await handler.getActivedTasks(
             '0x86a6b23bFAA35E3605bdA8C091d3Ca52b7e985F8'
           )
         ).length

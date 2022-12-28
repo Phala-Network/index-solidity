@@ -7,12 +7,12 @@
 const hre = require('hardhat')
 
 async function main() {
-  const Aggregator = await hre.ethers.getContractFactory('Aggregator')
-  const aggregator = await Aggregator.deploy()
+  const Handler = await hre.ethers.getContractFactory('Handler')
+  const handler = await Handler.deploy()
 
-  await aggregator.deployed()
+  await handler.deployed()
 
-  console.log(`Aggregator deployed to ${aggregator.address}`)
+  console.log(`Handler deployed to ${handler.address}`)
 }
 
 // We recommend this pattern to be able to use async/await everywhere
