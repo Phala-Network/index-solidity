@@ -105,23 +105,40 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     }
 
     // Worker claim last actived request that belong to this worker
-    function claim() external whenNotPaused onlyWorker nonReentrant {
+    function claim(bytes32 requestId) external whenNotPaused onlyWorker nonReentrant {
         bytes32[] memory requests = _activedRequests[msg.sender];
-        if (requests.length > 0) {
-            bytes32 request_id = requests[requests.length - 1];
-            // Remove last request from storage
-            _activedRequests[msg.sender].pop();
-            DepositInfo memory depositInfo = _depositRecords[request_id];
-            require(
-                depositInfo.token.balanceOf(address(this)) >=
-                    depositInfo.amount,
-                'Insufficient balance'
-            );
-            // Transfer asset to worker account
-            depositInfo.token.safeTransfer(msg.sender, depositInfo.amount);
-
-            emit Claimed(msg.sender, request_id);
+        // Check if request is exist
+        uint check_index = 0;
+        for (; check_index < requests.length; check_index++) {
+            if (requestId == requests[check_index]) break;
         }
+        require(requests.length > 0 && check_index < requests.length, "Request does not exist");
+
+        // Copy rest of requests
+        bytes32[] memory remaining_requests = new bytes32[](requests.length - 1);
+        for (uint i = 0; i < requests.length; i++) {
+            if (requests[i] == requestId) {
+                // Remove last request from storage
+                DepositInfo memory depositInfo = _depositRecords[requestId];
+                require(
+                    depositInfo.token.balanceOf(address(this)) >=
+                        depositInfo.amount,
+                    'Insufficient balance'
+                );
+                // Transfer asset to worker account
+                depositInfo.token.safeTransfer(msg.sender, depositInfo.amount);
+            } else {
+                if (i < check_index) {
+                    remaining_requests[i] = requests[i];
+                } else {
+                    // Shift
+                    remaining_requests[i - 1] = requests[i];
+                }
+            }
+        }
+        // Assign remain requests to storage
+        _activedRequests[msg.sender] = remaining_requests;
+        emit Claimed(msg.sender, requestId);
     }
 
     // Worker claim all actived requests that belong to this worker

@@ -249,9 +249,13 @@ describe('Handler', function () {
           '0x1234'
         )
 
-      await expect(handler.connect(user).claim()).to.be.revertedWith(
-        'Not worker'
-      )
+      await expect(
+        handler
+          .connect(user)
+          .claim(
+            '0x0000000000000000000000000000000000000000000000000000000000000001'
+          )
+      ).to.be.revertedWith('Not worker')
     })
 
     it('Claim last request should work', async function () {
@@ -288,7 +292,13 @@ describe('Handler', function () {
         '0x0000000000000000000000000000000000000000000000000000000000000001'
       )
 
-      await expect(handler.connect(worker).claim())
+      await expect(
+        handler
+          .connect(worker)
+          .claim(
+            '0x0000000000000000000000000000000000000000000000000000000000000001'
+          )
+      )
         .to.emit(handler, 'Claimed')
         .withArgs(
           worker.address,
