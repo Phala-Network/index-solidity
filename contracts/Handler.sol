@@ -14,7 +14,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    uint256 private constant WORKER_MAX_REQUEST_COUNT = 10;
+    uint256 private constant WORKER_MAX_TASK_COUNT = 10;
 
     struct DepositInfo {
         // Sender address on source chain
@@ -26,13 +26,13 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         // Recipient address on dest chain
         bytes recipient;
         // Encoded execution plan produced by Solver
-        string request;
+        string task;
     }
 
-    // requestId => DepositInfo
+    // taskId => DepositInfo
     mapping(bytes32 => DepositInfo) public _depositRecords;
-    // workerAddress => requestId[]
-    mapping(address => bytes32[]) public _activedRequests;
+    // workerAddress => taskId[]
+    mapping(address => bytes32[]) public _activedTasks;
     // workerAddress => isWorker
     mapping(address => bool) public _workers;
 
@@ -41,10 +41,10 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         address indexed token,
         uint256 amount,
         bytes recipient,
-        string request
+        string task
     );
 
-    event Claimed(address indexed worker, bytes32 indexed requestId);
+    event Claimed(address indexed worker, bytes32 indexed taskId);
 
     modifier onlyWorker() {
         require(_workers[_msgSender()], 'Not worker');
@@ -61,27 +61,27 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         _workers[worker] = false;
     }
 
-    // Temporary transfer asset to contract and save the corresponding request data
+    // Temporary transfer asset to contract and save the corresponding task data
     function deposit(
         address token,
         uint256 amount,
         bytes memory recipient,
         address worker,
-        bytes32 requestId,
-        string memory request
+        bytes32 taskId,
+        string memory task
     ) external whenNotPaused nonReentrant {
         require(token != address(0), 'Illegal token address');
         require(amount > 0, 'Zero transfer');
         require(recipient.length > 0, 'Illegal recipient data');
         require(worker != address(0), 'Illegal worker address');
         require(
-            bytes(_depositRecords[requestId].request).length == 0,
-            'Duplicate request'
+            bytes(_depositRecords[taskId].task).length == 0,
+            'Duplicate task'
         );
-        require(bytes(request).length > 0, 'Illegal request data');
+        require(bytes(task).length > 0, 'Illegal task data');
         require(
-            _activedRequests[worker].length < WORKER_MAX_REQUEST_COUNT,
-            'Too many requests'
+            _activedTasks[worker].length < WORKER_MAX_TASK_COUNT,
+            'Too many tasks'
         );
 
         uint256 preBalance = IERC20(token).balanceOf(address(this));
@@ -90,36 +90,36 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         uint256 postBalance = IERC20(token).balanceOf(address(this));
         require(postBalance.sub(preBalance) == amount, 'Transfer failed');
 
-        // Put request id to actived request list
-        bytes32[] storage requests = _activedRequests[worker];
-        requests.push(requestId);
-        // Save request details
-        _depositRecords[requestId] = DepositInfo({
+        // Put task id to actived task list
+        bytes32[] storage tasks = _activedTasks[worker];
+        tasks.push(taskId);
+        // Save task details
+        _depositRecords[taskId] = DepositInfo({
             sender: msg.sender,
             token: IERC20(token),
             amount: amount,
             recipient: recipient,
-            request: request
+            task: task
         });
-        emit Deposited(msg.sender, token, amount, recipient, request);
+        emit Deposited(msg.sender, token, amount, recipient, task);
     }
 
-    // Worker claim last actived request that belong to this worker
-    function claim(bytes32 requestId) external whenNotPaused onlyWorker nonReentrant {
-        bytes32[] memory requests = _activedRequests[msg.sender];
-        // Check if request is exist
+    // Worker claim last actived task that belong to this worker
+    function claim(bytes32 taskId) external whenNotPaused onlyWorker nonReentrant {
+        bytes32[] memory tasks = _activedTasks[msg.sender];
+        // Check if task is exist
         uint check_index = 0;
-        for (; check_index < requests.length; check_index++) {
-            if (requestId == requests[check_index]) break;
+        for (; check_index < tasks.length; check_index++) {
+            if (taskId == tasks[check_index]) break;
         }
-        require(requests.length > 0 && check_index < requests.length, "Request does not exist");
+        require(tasks.length > 0 && check_index < tasks.length, "Task does not exist");
 
-        // Copy rest of requests
-        bytes32[] memory remaining_requests = new bytes32[](requests.length - 1);
-        for (uint i = 0; i < requests.length; i++) {
-            if (requests[i] == requestId) {
-                // Remove last request from storage
-                DepositInfo memory depositInfo = _depositRecords[requestId];
+        // Copy rest of tasks
+        bytes32[] memory remaining_tasks = new bytes32[](tasks.length - 1);
+        for (uint i = 0; i < tasks.length; i++) {
+            if (tasks[i] == taskId) {
+                // Remove last task from storage
+                DepositInfo memory depositInfo = _depositRecords[taskId];
                 require(
                     depositInfo.token.balanceOf(address(this)) >=
                         depositInfo.amount,
@@ -129,23 +129,23 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
                 depositInfo.token.safeTransfer(msg.sender, depositInfo.amount);
             } else {
                 if (i < check_index) {
-                    remaining_requests[i] = requests[i];
+                    remaining_tasks[i] = tasks[i];
                 } else {
                     // Shift
-                    remaining_requests[i - 1] = requests[i];
+                    remaining_tasks[i - 1] = tasks[i];
                 }
             }
         }
-        // Assign remain requests to storage
-        _activedRequests[msg.sender] = remaining_requests;
-        emit Claimed(msg.sender, requestId);
+        // Assign remain tasks to storage
+        _activedTasks[msg.sender] = remaining_tasks;
+        emit Claimed(msg.sender, taskId);
     }
 
-    // Worker claim all actived requests that belong to this worker
+    // Worker claim all actived tasks that belong to this worker
     function claim_all() external whenNotPaused onlyWorker nonReentrant {
-        bytes32[] memory requests = _activedRequests[msg.sender];
-        for (uint256 i = 0; i < requests.length; i++) {
-            DepositInfo memory depositInfo = _depositRecords[requests[i]];
+        bytes32[] memory tasks = _activedTasks[msg.sender];
+        for (uint256 i = 0; i < tasks.length; i++) {
+            DepositInfo memory depositInfo = _depositRecords[tasks[i]];
             require(
                 depositInfo.token.balanceOf(address(this)) >=
                     depositInfo.amount,
@@ -154,36 +154,36 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
             // Transfer asset to worker account
             depositInfo.token.safeTransfer(msg.sender, depositInfo.amount);
 
-            emit Claimed(msg.sender, requests[i]);
+            emit Claimed(msg.sender, tasks[i]);
         }
 
-        // Clear actived requests list
-        delete _activedRequests[msg.sender];
+        // Clear actived tasks list
+        delete _activedTasks[msg.sender];
     }
 
-    function getLastActivedRequest(address worker)
+    function getLastActivedTask(address worker)
         public
         view
         returns (bytes32)
     {
-        bytes32[] memory requests = _activedRequests[worker];
-        if (requests.length > 0) return requests[requests.length - 1];
+        bytes32[] memory tasks = _activedTasks[worker];
+        if (tasks.length > 0) return tasks[tasks.length - 1];
         else return bytes32(0);
     }
 
-    function getActivedRequests(address worker)
+    function getActivedTasks(address worker)
         public
         view
         returns (bytes32[] memory)
     {
-        return _activedRequests[worker];
+        return _activedTasks[worker];
     }
 
-    function getRequestData(bytes32 requestId)
+    function getTaskData(bytes32 taskId)
         public
         view
         returns (DepositInfo memory)
     {
-        return _depositRecords[requestId];
+        return _depositRecords[taskId];
     }
 }
