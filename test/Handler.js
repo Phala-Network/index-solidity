@@ -349,4 +349,99 @@ describe('Handler', function () {
       expect((await handler.getActivedTasks(worker.address)).length).to.equal(0)
     })
   })
+
+  describe('Drop', function () {
+    it('Should revert if sender is not worker', async function () {
+      const {token, handler, worker, user} = await loadFixture(
+        deployHandlerFixture
+      )
+
+      // Set worker
+      await handler.setWorker(worker.address)
+      // User approve to handler
+      token.connect(user).approve(handler.address, '10000')
+
+      await expect(
+        handler
+          .connect(user)
+          .deposit(
+            token.address,
+            '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+            worker.address,
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+            '0x1234'
+          )
+      )
+        .to.emit(handler, 'Deposited')
+        .withArgs(
+          user.address,
+          token.address,
+          '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+          '0x1234'
+        )
+
+      await expect(
+        handler
+          .connect(user)
+          .drop(
+            '0x0000000000000000000000000000000000000000000000000000000000000001'
+          )
+      ).to.be.revertedWith('Not worker')
+    })
+
+    it('Drop task should work', async function () {
+      const {token, handler, worker, user} = await loadFixture(
+        deployHandlerFixture
+      )
+      // Set worker
+      await handler.setWorker(worker.address)
+      // User approve to handler
+      token.connect(user).approve(handler.address, '10000')
+
+      await expect(
+        handler
+          .connect(user)
+          .deposit(
+            token.address,
+            '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+            worker.address,
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+            '0x1234'
+          )
+      )
+        .to.emit(handler, 'Deposited')
+        .withArgs(
+          user.address,
+          token.address,
+          '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+          '0x1234'
+        )
+
+      expect(await handler.getLastActivedTask(worker.address)).to.equal(
+        '0x0000000000000000000000000000000000000000000000000000000000000001'
+      )
+      expect(await token.balanceOf(user.address)).to.equal('9900')
+
+      await expect(
+        handler
+          .connect(worker)
+          .drop(
+            '0x0000000000000000000000000000000000000000000000000000000000000001'
+          )
+      )
+        .to.emit(handler, 'Dropped')
+        .withArgs(
+          worker.address,
+          '0x0000000000000000000000000000000000000000000000000000000000000001'
+        )
+      expect(await handler.getLastActivedTask(worker.address)).to.equal(
+        '0x0000000000000000000000000000000000000000000000000000000000000000'
+      )
+      expect(await token.balanceOf(user.address)).to.equal('10000')
+    })
+  })
 })

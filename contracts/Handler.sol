@@ -45,6 +45,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     );
 
     event Claimed(address indexed worker, bytes32 indexed taskId);
+    event Dropped(address indexed worker, bytes32 indexed taskId);
 
     modifier onlyWorker() {
         require(_workers[_msgSender()], 'Not worker');
@@ -52,6 +53,13 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     }
 
     constructor() {}
+
+    function setMultiWorkers(address[] memory workers) external onlyOwner {
+        require(workers.length < 100, 'Too many workers');
+        for (uint i = 0; i < workers.length; i++) {
+            _workers[workers[i]] = true;
+        }
+    }
 
     function setWorker(address worker) external onlyOwner {
         _workers[worker] = true;
@@ -102,6 +110,43 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
             task: task
         });
         emit Deposited(msg.sender, token, amount, recipient, task);
+    }
+
+    // Drop task data and trigger asset beeing transfered back to task depositor
+    function drop(bytes32 taskId) external whenNotPaused onlyWorker nonReentrant {
+        bytes32[] memory tasks = _activedTasks[msg.sender];
+        // Check if task is exist
+        uint check_index = 0;
+        for (; check_index < tasks.length; check_index++) {
+            if (taskId == tasks[check_index]) break;
+        }
+        require(tasks.length > 0 && check_index < tasks.length, "Task does not exist");
+
+        // Copy rest of tasks
+        bytes32[] memory remaining_tasks = new bytes32[](tasks.length - 1);
+        for (uint i = 0; i < tasks.length; i++) {
+            if (tasks[i] == taskId) {
+                // Remove last task from storage
+                DepositInfo memory depositInfo = _depositRecords[taskId];
+                require(
+                    depositInfo.token.balanceOf(address(this)) >=
+                        depositInfo.amount,
+                    'Insufficient balance'
+                );
+                // Transfer asset back to task depositor account
+                depositInfo.token.safeTransfer(depositInfo.sender, depositInfo.amount);
+            } else {
+                if (i < check_index) {
+                    remaining_tasks[i] = tasks[i];
+                } else {
+                    // Shift
+                    remaining_tasks[i - 1] = tasks[i];
+                }
+            }
+        }
+        // Assign remain tasks to storage
+        _activedTasks[msg.sender] = remaining_tasks;
+        emit Dropped(msg.sender, taskId);
     }
 
     // Worker claim last actived task that belong to this worker
