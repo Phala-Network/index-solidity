@@ -345,7 +345,7 @@ describe('Handler', function () {
         10
       )
 
-      await handler.connect(worker).claim_all()
+      await handler.connect(worker).claimAll()
       expect((await handler.getActivedTasks(worker.address)).length).to.equal(0)
     })
   })

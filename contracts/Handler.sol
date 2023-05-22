@@ -114,80 +114,46 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
 
     // Drop task data and trigger asset beeing transfered back to task depositor
     function drop(bytes32 taskId) external whenNotPaused onlyWorker nonReentrant {
-        bytes32[] memory tasks = _activedTasks[msg.sender];
+        DepositInfo memory depositInfo = this.findActivedTask(msg.sender, taskId);
         // Check if task is exist
-        uint check_index = 0;
-        for (; check_index < tasks.length; check_index++) {
-            if (taskId == tasks[check_index]) break;
-        }
-        require(tasks.length > 0 && check_index < tasks.length, "Task does not exist");
+        require(depositInfo.sender != address(0), "Task does not exist");
 
-        // Copy rest of tasks
-        bytes32[] memory remaining_tasks = new bytes32[](tasks.length - 1);
-        for (uint i = 0; i < tasks.length; i++) {
-            if (tasks[i] == taskId) {
-                // Remove last task from storage
-                DepositInfo memory depositInfo = _depositRecords[taskId];
-                require(
-                    depositInfo.token.balanceOf(address(this)) >=
-                        depositInfo.amount,
-                    'Insufficient balance'
-                );
-                // Transfer asset back to task depositor account
-                depositInfo.token.safeTransfer(depositInfo.sender, depositInfo.amount);
-            } else {
-                if (i < check_index) {
-                    remaining_tasks[i] = tasks[i];
-                } else {
-                    // Shift
-                    remaining_tasks[i - 1] = tasks[i];
-                }
-            }
-        }
-        // Assign remain tasks to storage
-        _activedTasks[msg.sender] = remaining_tasks;
+        // Remove task
+        removeTask(msg.sender, taskId);
+
+        // Transfer asset back to task depositor account
+        require(
+            depositInfo.token.balanceOf(address(this)) >=
+                depositInfo.amount,
+            'Insufficient balance'
+        );
+        depositInfo.token.safeTransfer(depositInfo.sender, depositInfo.amount);
+
         emit Dropped(msg.sender, taskId);
     }
 
     // Worker claim last actived task that belong to this worker
     function claim(bytes32 taskId) external whenNotPaused onlyWorker nonReentrant {
-        bytes32[] memory tasks = _activedTasks[msg.sender];
+        DepositInfo memory depositInfo = this.findActivedTask(msg.sender, taskId);
         // Check if task is exist
-        uint check_index = 0;
-        for (; check_index < tasks.length; check_index++) {
-            if (taskId == tasks[check_index]) break;
-        }
-        require(tasks.length > 0 && check_index < tasks.length, "Task does not exist");
+        require(depositInfo.sender != address(0), "Task does not exist");
 
-        // Copy rest of tasks
-        bytes32[] memory remaining_tasks = new bytes32[](tasks.length - 1);
-        for (uint i = 0; i < tasks.length; i++) {
-            if (tasks[i] == taskId) {
-                // Remove last task from storage
-                DepositInfo memory depositInfo = _depositRecords[taskId];
-                require(
-                    depositInfo.token.balanceOf(address(this)) >=
-                        depositInfo.amount,
-                    'Insufficient balance'
-                );
-                // Transfer asset to worker account
-                depositInfo.token.safeTransfer(msg.sender, depositInfo.amount);
-            } else {
-                if (i < check_index) {
-                    remaining_tasks[i] = tasks[i];
-                } else {
-                    // Shift
-                    remaining_tasks[i - 1] = tasks[i];
-                }
-            }
-        }
-        // Assign remain tasks to storage
-        _activedTasks[msg.sender] = remaining_tasks;
+        // Remove task
+        removeTask(msg.sender, taskId);
+
+        // Transfer asset to worker account
+        require(
+            depositInfo.token.balanceOf(address(this)) >=
+                depositInfo.amount,
+            'Insufficient balance'
+        );
+        depositInfo.token.safeTransfer(msg.sender, depositInfo.amount);
+
         emit Claimed(msg.sender, taskId);
     }
 
     // Worker claim all actived tasks that belong to this worker
-    function claim_all() external whenNotPaused onlyWorker nonReentrant {
+    function claimAll() external whenNotPaused onlyWorker nonReentrant {
         bytes32[] memory tasks = _activedTasks[msg.sender];
         for (uint256 i = 0; i < tasks.length; i++) {
             DepositInfo memory depositInfo = _depositRecords[tasks[i]];
@@ -204,6 +170,15 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
 
         // Clear actived tasks list
         delete _activedTasks[msg.sender];
+    }
+
+    function findActivedTask(address worker, bytes32 taskId) public view returns (DepositInfo memory depositInfo) {
+        bytes32[] memory tasks = _activedTasks[worker];
+        uint checkIndex = 0;
+        for (; checkIndex < tasks.length; checkIndex++) {
+            if (taskId == tasks[checkIndex]) return _depositRecords[taskId];
+        }
+        return depositInfo;
     }
 
     function getLastActivedTask(address worker)
@@ -230,5 +205,32 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         returns (DepositInfo memory)
     {
         return _depositRecords[taskId];
+    }
+
+    function removeTask(address worker, bytes32 taskId) internal {
+        bytes32[] memory tasks = _activedTasks[worker];
+        uint checkIndex = 0;
+        for (; checkIndex < tasks.length; checkIndex++) {
+            if (taskId == tasks[checkIndex]) break;
+        }
+        // Task not found
+        if (checkIndex >= tasks.length) return;
+
+        // If tasks has more than 1 item, we should keep remaining items
+        if (tasks.length == 1) {
+            _activedTasks[worker] = new bytes32[](0);
+        } else {
+            bytes32[] memory remainingTasks = new bytes32[](tasks.length - 1);
+            for (uint i = 0; i < tasks.length; i++) {
+                if (i < checkIndex) {
+                    remainingTasks[i] = tasks[i];
+                } else {
+                    // Shift
+                    remainingTasks[i - 1] = tasks[i];
+                }
+            }
+            // Assign remain tasks to storage
+            _activedTasks[worker] = remainingTasks;
+        }
     }
 }
