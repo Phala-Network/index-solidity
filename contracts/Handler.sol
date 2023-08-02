@@ -14,6 +14,8 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
+    address self;
+
     uint256 private constant WORKER_MAX_TASK_COUNT = 10;
 
     struct DepositInfo {
@@ -52,7 +54,9 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         _;
     }
 
-    constructor() {}
+    constructor() {
+        self = address(this);
+    }
 
     function setMultiWorkers(address[] memory workers) external onlyOwner {
         require(workers.length < 100, 'Too many workers');
@@ -92,10 +96,10 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
             'Too many tasks'
         );
 
-        uint256 preBalance = IERC20(token).balanceOf(address(this));
+        uint256 preBalance = IERC20(token).balanceOf(self);
         // Transfer from sender to contract
-        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        uint256 postBalance = IERC20(token).balanceOf(address(this));
+        IERC20(token).safeTransferFrom(msg.sender, self, amount);
+        uint256 postBalance = IERC20(token).balanceOf(self);
         require(postBalance.sub(preBalance) == amount, 'Transfer failed');
 
         // Put task id to actived task list
@@ -123,7 +127,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
 
         // Transfer asset back to task depositor account
         require(
-            depositInfo.token.balanceOf(address(this)) >=
+            depositInfo.token.balanceOf(self) >=
                 depositInfo.amount,
             'Insufficient balance'
         );
@@ -143,7 +147,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
 
         // Transfer asset to worker account
         require(
-            depositInfo.token.balanceOf(address(this)) >=
+            depositInfo.token.balanceOf(self) >=
                 depositInfo.amount,
             'Insufficient balance'
         );
@@ -158,7 +162,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         for (uint256 i = 0; i < tasks.length; i++) {
             DepositInfo memory depositInfo = _depositRecords[tasks[i]];
             require(
-                depositInfo.token.balanceOf(address(this)) >=
+                depositInfo.token.balanceOf(self) >=
                     depositInfo.amount,
                 'Insufficient balance'
             );
