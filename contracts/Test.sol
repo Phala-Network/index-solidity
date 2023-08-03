@@ -37,7 +37,7 @@ contract Test {
     function swap(address token1, address token2, uint amount) public {
         console.log("---> swap: ", token1, token2, amount);
         IERC20(token1).transferFrom(msg.sender, address(this), amount);
-        IERC20(token2).transferFrom(address(this), msg.sender, amount / 2);
+        IERC20(token2).transfer(msg.sender, amount / 2);
 
         emit Swap(token1, token2, amount, amount / 2);
         console.log("---> swap done");
