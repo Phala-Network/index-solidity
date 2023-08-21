@@ -207,7 +207,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     function _batchCall(Call[] calldata calls) internal returns (Result[] memory returnData) {
     
         uint256 length = calls.length;
-        require(length > 1, 'Too few calls');
+        require(length >= 1, 'Too few calls');
 
         // Check spendAsset
         require(
