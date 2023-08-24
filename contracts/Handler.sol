@@ -9,7 +9,6 @@ import '@openzeppelin/contracts/security/Pausable.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/math/SafeMath.sol';
-import "hardhat/console.sol";
 
 contract Handler is ReentrancyGuard, Ownable, Pausable {
     using SafeMath for uint256;
@@ -186,6 +185,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         DepositInfo memory depositInfo = this.findActivedTask(msg.sender, taskId);
         // Check if task is exist
         require(depositInfo.sender != address(0), "Task does not exist");
+        require(calls.length > 1, 'Too few calls');
 
         // Check first call
         require(calls[0].spendAsset == address(depositInfo.token), "spendAsset mismatch");
@@ -207,7 +207,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     function _batchCall(Call[] calldata calls) internal returns (Result[] memory returnData) {
     
         uint256 length = calls.length;
-        require(length >= 1, 'Too few calls');
+        require(length > 1, 'Too few calls');
 
         // Check spendAsset
         require(
@@ -221,25 +221,25 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         uint256 settleAmount = 0;
 
         for (uint256 i = 0; i < length;) {
-            console.log("===> Start execute call: ", i);
+            // console.log("===> Start execute call: ", i);
             Result memory result = returnData[i];
             Call memory calli = calls[i];
 
             // update calldata from second call
             if (i > 0 && calli.inputCall == inputCall.callIndex && calli.spendAsset == inputCall.receiveAsset) {
                 // Update settleAmount to calldata from offset
-                console.log("===> Update settleAmount to calldata from offset: ", settleAmount);
+                // console.log("===> Update settleAmount to calldata from offset: ", settleAmount);
                 bytes memory settleAmountBytes = abi.encodePacked(settleAmount);
                 require(inputCall.needSettle, 'Input call must be settled');
                 require(calli.updateLen == 32, 'Unsupported update length');
 
-                console.log("===> Calldata before update: ");
-                console.logBytes(calli.callData);
+                // console.log("===> Calldata before update: ");
+                // console.logBytes(calli.callData);
                 for(uint j = 0; j < calli.updateLen; j++) {
                     calli.callData[j + calli.updateOffset] = settleAmountBytes[j];
                 }
-                console.log("===> Calldata after update: ");
-                console.logBytes(calli.callData);
+                // console.log("===> Calldata after update: ");
+                // console.logBytes(calli.callData);
             }
 
             uint256 preBalance;
@@ -249,12 +249,12 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
                 preBalance = IERC20(calli.receiveAsset).balanceOf(self);
             }
 
-            console.log("===> Ready to execute call");
+            // console.log("===> Ready to execute call");
             // Execute
             (result.success, result.returnData) = calli.target.call(calli.callData);
-            console.log("===> Execute result: ", result.success);
-            console.log("===> Return data:");
-            console.logBytes(result.returnData);
+            // console.log("===> Execute result: ", result.success);
+            // console.log("===> Return data:");
+            // console.logBytes(result.returnData);
             require(result.success, string(abi.encodePacked(string("Call failed: "), string(result.returnData))));
             unchecked { ++i; }
 
@@ -263,7 +263,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
                 postBalance = IERC20(calli.receiveAsset).balanceOf(self);
                 settleAmount = postBalance.sub(preBalance);
                 inputCall = calli;
-                console.log("===> Call", calli.callIndex, "been settled: ", settleAmount);
+                // console.log("===> Call", calli.callIndex, "been settled: ", settleAmount);
             }
         }
     }
