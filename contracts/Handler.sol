@@ -217,8 +217,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         );
 
         returnData = new Result[](length);
-        Call memory inputCall;
-        uint256 settleAmount = 0;
+        uint256 [] memory settleAmounts = new uint256[](calls.length);
 
         for (uint256 i = 0; i < length;) {
             // console.log("===> Start execute call: ", i);
@@ -226,20 +225,25 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
             Call memory calli = calls[i];
 
             // update calldata from second call
-            if (i > 0 && calli.inputCall == inputCall.callIndex && calli.spendAsset == inputCall.receiveAsset) {
-                // Update settleAmount to calldata from offset
-                // console.log("===> Update settleAmount to calldata from offset: ", settleAmount);
-                bytes memory settleAmountBytes = abi.encodePacked(settleAmount);
-                require(inputCall.needSettle, 'Input call must be settled');
-                require(calli.updateLen == 32, 'Unsupported update length');
+            if (i > 0) {
+                Call memory inputCall = calls[calli.inputCall];
 
-                // console.log("===> Calldata before update: ");
-                // console.logBytes(calli.callData);
-                for(uint j = 0; j < calli.updateLen; j++) {
-                    calli.callData[j + calli.updateOffset] = settleAmountBytes[j];
+                if (inputCall.needSettle && calli.spendAsset == inputCall.receiveAsset) {
+                    // Update settleAmount to calldata from offset
+                    uint256 settleAmount = settleAmounts[inputCall.callIndex];
+                    // console.log("===> Update settleAmount to calldata from offset: ", settleAmount);
+                    require(settleAmount > 0, 'Settle amount must be greater than 0');
+                    require(calli.updateLen == 32, 'Unsupported update length');
+                    bytes memory settleAmountBytes = abi.encodePacked(settleAmount);
+
+                    // console.log("===> Calldata before update: ");
+                    // console.logBytes(calli.callData);
+                    for(uint j = 0; j < calli.updateLen; j++) {
+                        calli.callData[j + calli.updateOffset] = settleAmountBytes[j];
+                    }
+                    // console.log("===> Calldata after update: ");
+                    // console.logBytes(calli.callData);
                 }
-                // console.log("===> Calldata after update: ");
-                // console.logBytes(calli.callData);
             }
 
             uint256 preBalance;
@@ -261,9 +265,8 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
             // Settle balance after execution
             if (calli.needSettle) {
                 postBalance = IERC20(calli.receiveAsset).balanceOf(self);
-                settleAmount = postBalance.sub(preBalance);
-                inputCall = calli;
-                // console.log("===> Call", calli.callIndex, "been settled: ", settleAmount);
+                settleAmounts[calli.callIndex] = postBalance.sub(preBalance);
+                // console.log("===> Call", calli.callIndex, "been settled: ", settleAmounts[calli.callIndex]);
             }
         }
     }

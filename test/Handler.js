@@ -501,7 +501,7 @@ describe('Handler', function () {
 
       // Construct call data
       // The call are as follows:
-      // [Test.claim(), TokenA.Approve(), Test.swap(), Test.doNothing(), TokenB.approve(), Test.bridge()]
+      // [Test.doNothing(), Test.claim(), TokenA.Approve(), Test.swap(), Test.doNothing(), TokenB.approve(), Test.bridge()]
       let callDataClaim = test.interface.encodeFunctionData('claim', [
         token.address,
         '200',
@@ -542,6 +542,23 @@ describe('Handler', function () {
       // Batch call
       await expect(
         handler.connect(worker).batchCall([
+          [
+            test.address,
+            callDataDoNothing,
+            '0',
+
+            false,
+            // No need to update at first call
+            '0',
+            '0',
+            token.address,
+            // We don't need to spend any asset because we do claim that will be sent asset
+            '0',
+            token.address,
+            // Will be ingored because this is the first call
+            '0',
+            '0',
+          ],
           // Test -> Handler: 200 TT
           [
             test.address,
@@ -558,7 +575,7 @@ describe('Handler', function () {
             token.address,
             // Will be ingored because this is the first call
             '0',
-            '0',
+            '1',
           ],
           // Token(Handler).approve(Test, 200 TT)
           [
@@ -573,8 +590,8 @@ describe('Handler', function () {
             '10000',
             token.address,
             // Use the claim  call output as input
-            '0',
             '1',
+            '2',
           ],
           // Handler -> Test: 200 TT
           // Test -> Handler: 100 TTB
@@ -590,8 +607,8 @@ describe('Handler', function () {
             '10000',
             tokenB.address,
             // Use the claim  call output as input
-            '0',
-            '2',
+            '1',
+            '3',
           ],
           // Do nothing
           [
@@ -606,8 +623,8 @@ describe('Handler', function () {
             '10000',
             tokenB.address,
             // Use the swap call output as input
-            '2',
             '3',
+            '4',
           ],
           // TokenB(Hanler).approve(Test, 100 TTB)
           [
@@ -622,8 +639,8 @@ describe('Handler', function () {
             '10000',
             tokenB.address,
             // Use the swap  call output as input
-            '2',
-            '4',
+            '3',
+            '5',
           ],
           // Handler -> Test: 100 TTB
           [
@@ -639,11 +656,12 @@ describe('Handler', function () {
             '10000',
             tokenB.address,
             // Still use the swap call output as input
-            '2',
-            '5',
+            '3',
+            '6',
           ],
         ])
       )
+        .to.emit(test, 'Nothing')
         .to.emit(test, 'Claim')
         .withArgs(token.address, '200')
         .to.emit(test, 'Swap')
