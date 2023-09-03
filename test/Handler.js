@@ -31,21 +31,6 @@ describe('Handler', function () {
   }
 
   describe('Deposit', function () {
-    it('Should revert if token address is 0', async function () {
-      const {handler, worker} = await loadFixture(deployHandlerFixture)
-
-      await expect(
-        handler.deposit(
-          '0x0000000000000000000000000000000000000000',
-          '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-          worker.address,
-          '0x0000000000000000000000000000000000000000000000000000000000000001',
-          '0x1234'
-        )
-      ).to.be.revertedWith('Illegal token address')
-    })
-
     it('Should revert if transfer amount is 0', async function () {
       const {handler, worker} = await loadFixture(deployHandlerFixture)
 
@@ -130,6 +115,38 @@ describe('Handler', function () {
         .withArgs(
           user.address,
           token.address,
+          '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+          '0x1234'
+        )
+    })
+
+    it('Deposit native should work', async function () {
+      const {_token, handler, worker, user} = await loadFixture(
+        deployHandlerFixture
+      )
+
+      await expect(
+        handler
+          .connect(user)
+          .deposit(
+            // address(0), default represent native token
+            '0x0000000000000000000000000000000000000000',
+            '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+            worker.address,
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+            '0x1234',
+            {
+              // Pay native token
+              value: '100',
+            }
+          )
+      )
+        .to.emit(handler, 'Deposited')
+        .withArgs(
+          user.address,
+          '0x0000000000000000000000000000000000000000',
           '100',
           '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
           '0x1234'
@@ -316,6 +333,52 @@ describe('Handler', function () {
         '0x0000000000000000000000000000000000000000000000000000000000000000'
       )
     })
+
+    it('Claim native asset deposit should work', async function () {
+      const {_token, handler, worker, user} = await loadFixture(
+        deployHandlerFixture
+      )
+      // Set worker
+      await handler.setWorker(worker.address)
+
+      await expect(
+        handler
+          .connect(user)
+          .deposit(
+            // address(0), default represent native token
+            '0x0000000000000000000000000000000000000000',
+            '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+            worker.address,
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+            '0x1234',
+            {
+              value: '100',
+            }
+          )
+      )
+        .to.emit(handler, 'Deposited')
+        .withArgs(
+          user.address,
+          '0x0000000000000000000000000000000000000000',
+          '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+          '0x1234'
+        )
+
+      await expect(
+        handler
+          .connect(worker)
+          .claim(
+            '0x0000000000000000000000000000000000000000000000000000000000000001'
+          )
+      )
+        .to.emit(handler, 'Claimed')
+        .withArgs(
+          worker.address,
+          '0x0000000000000000000000000000000000000000000000000000000000000001'
+        )
+    })
   })
 
   describe('Drop', function () {
@@ -411,6 +474,55 @@ describe('Handler', function () {
       )
       expect(await token.balanceOf(user.address)).to.equal('10000')
     })
+
+    it('Drop native asset deposit task should work', async function () {
+      const {_token, handler, worker, user} = await loadFixture(
+        deployHandlerFixture
+      )
+      // Set worker
+      await handler.setWorker(worker.address)
+
+      await expect(
+        handler
+          .connect(user)
+          .deposit(
+            // address(0), default represent native token
+            '0x0000000000000000000000000000000000000000',
+            '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+            worker.address,
+            '0x0000000000000000000000000000000000000000000000000000000000000001',
+            '0x1234',
+            {
+              value: '100'
+            }
+          )
+      )
+        .to.emit(handler, 'Deposited')
+        .withArgs(
+          user.address,
+          '0x0000000000000000000000000000000000000000',
+          '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+          '0x1234'
+        )
+
+      await expect(
+        handler
+          .connect(worker)
+          .drop(
+            '0x0000000000000000000000000000000000000000000000000000000000000001'
+          )
+      )
+        .to.emit(handler, 'Dropped')
+        .withArgs(
+          worker.address,
+          '0x0000000000000000000000000000000000000000000000000000000000000001'
+        )
+      expect(await handler.getLastActivedTask(worker.address)).to.equal(
+        '0x0000000000000000000000000000000000000000000000000000000000000000'
+      )
+    })
   })
 
   // Test contract: 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9
@@ -493,12 +605,6 @@ describe('Handler', function () {
       const {token, handler, owner, worker, user, tokenB, test} =
         await loadFixture(deployHandlerFixture)
 
-      console.log(`Test contract: ${test.address}`)
-      console.log(`Handler contract: ${handler.address}`)
-      console.log(`token contract: ${token.address}`)
-      console.log(`tokenB contract: ${tokenB.address}`)
-      console.log(`owner: ${owner.address}`)
-
       // Construct call data
       // The call are as follows:
       // [Test.doNothing(), Test.claim(), TokenA.Approve(), Test.swap(), Test.doNothing(), TokenB.approve(), Test.bridge()]
@@ -515,6 +621,9 @@ describe('Handler', function () {
         tokenB.address,
         '10000',
       ])
+      let callDataSwapNative = test.interface.encodeFunctionData('swapNative', [
+        token.address,
+      ])
       let callDataDoNothing = test.interface.encodeFunctionData('doNothing', [
         '10000',
       ])
@@ -526,13 +635,6 @@ describe('Handler', function () {
         tokenB.address,
         '10000',
       ])
-
-      console.log(`callDataClaim: ${callDataClaim}`)
-      console.log(`callDataTokenApprove: ${callDataTokenApprove}`)
-      console.log(`callDataSwap: ${callDataSwap}`)
-      console.log(`callDataDoNothing: ${callDataDoNothing}`)
-      console.log(`callDataTokenBApprove: ${callDataTokenBApprove}`)
-      console.log(`callDataBridge: ${callDataBridge}`)
 
       // Set worker
       await handler.setWorker(worker.address)
@@ -659,7 +761,26 @@ describe('Handler', function () {
             '3',
             '6',
           ],
-        ])
+          [
+            test.address,
+            callDataSwapNative,
+            // spend 100 wei native asset
+            '100',
+
+            true,
+            '0',
+            '0',
+            '0x0000000000000000000000000000000000000000',
+            '100',
+            token.address,
+            '6',
+            '7',
+          ],
+        ],
+        {
+          // Only last call spend 100 wei
+          value: '100',
+        })
       )
         .to.emit(test, 'Nothing')
         .to.emit(test, 'Claim')
@@ -670,6 +791,8 @@ describe('Handler', function () {
         .withArgs('100')
         .to.emit(test, 'Bridge')
         .withArgs(tokenB.address, '100')
+        .to.emit(test, 'SwapNative')
+        .withArgs(token.address, '100', '50')
     })
   })
 })
