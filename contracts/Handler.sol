@@ -85,6 +85,8 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         self = address(this);
     }
 
+    receive() external payable  {}
+
     function setMultiWorkers(address[] memory workers) external onlyOwner {
         require(workers.length < 100, 'Too many workers');
         for (uint i = 0; i < workers.length; i++) {
@@ -200,7 +202,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         emit Claimed(msg.sender, taskId);
     }
 
-    function claimAndBatchCall(bytes32 taskId, Call[] calldata calls) external whenNotPaused onlyWorker nonReentrant {
+    function claimAndBatchCall(bytes32 taskId, Call[] calldata calls) external payable whenNotPaused onlyWorker nonReentrant {
         DepositInfo memory depositInfo = this.findActivedTask(msg.sender, taskId);
         // Check if task is exist
         require(depositInfo.sender != address(0), "Task does not exist");
@@ -237,10 +239,8 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
 
         returnData = new Result[](length);
         uint256 [] memory settleAmounts = new uint256[](calls.length);
-        uint256 totalNativeAsset = 0;
 
         for (uint256 i = 0; i < length;) {
-            // console.log("===> Start execute call: ", i);
             Result memory result = returnData[i];
             Call memory calli = calls[i];
 
@@ -251,18 +251,17 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
                 if (inputCall.needSettle && calli.spendAsset == inputCall.receiveAsset) {
                     // Update settleAmount to calldata from offset
                     uint256 settleAmount = settleAmounts[inputCall.callIndex];
-                    // console.log("===> Update settleAmount to calldata from offset: ", settleAmount);
                     require(settleAmount > 0, 'Settle amount must be greater than 0');
-                    require(calli.updateLen == 32, 'Unsupported update length');
-                    bytes memory settleAmountBytes = abi.encodePacked(settleAmount);
+                    if (calli.spendAsset == nativeAsset) {
+                        calli.value = settleAmount;
+                    } else {
+                        require(calli.updateLen == 32, 'Unsupported update length');
+                        bytes memory settleAmountBytes = abi.encodePacked(settleAmount);
 
-                    // console.log("===> Calldata before update: ");
-                    // console.logBytes(calli.callData);
-                    for(uint j = 0; j < calli.updateLen; j++) {
-                        calli.callData[j + calli.updateOffset] = settleAmountBytes[j];
+                        for(uint j = 0; j < calli.updateLen; j++) {
+                            calli.callData[j + calli.updateOffset] = settleAmountBytes[j];
+                        }
                     }
-                    // console.log("===> Calldata after update: ");
-                    // console.logBytes(calli.callData);
                 }
             }
 
@@ -277,16 +276,11 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
                 }
             }
 
-            // console.log("===> Ready to execute call");
             // Execute
             (result.success, result.returnData) = calli.target.call{value: calli.value}(calli.callData);
-            // console.log("===> Execute result: ", result.success);
-            // console.log("===> Return data:");
-            // console.logBytes(result.returnData);
             require(result.success, string(abi.encodePacked(string("Call failed: "), string(result.returnData))));
             unchecked {
                 ++i;
-                totalNativeAsset += calli.value;
             }
 
             // Settle balance after execution
@@ -297,13 +291,8 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
                     postBalance = IERC20(calli.receiveAsset).balanceOf(self);
                 }
                 settleAmounts[calli.callIndex] = postBalance.sub(preBalance);
-                // console.log("===> Call", calli.callIndex, "been settled: ", settleAmounts[calli.callIndex]);
             }
         }
-        require(
-            msg.value == totalNativeAsset,
-            'msg.value not satisfy calls'
-        );
     }
 
     function findActivedTask(address worker, bytes32 taskId) public view returns (DepositInfo memory depositInfo) {
