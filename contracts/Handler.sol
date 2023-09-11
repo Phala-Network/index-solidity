@@ -28,7 +28,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         // Recipient address on dest chain
         bytes recipient;
         // Encoded execution plan produced by Solver
-        string task;
+        bytes task;
     }
 
     struct Call {
@@ -41,6 +41,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         bool needSettle;
         uint256 updateOffset;
         uint256 updateLen;
+        address spender;
         address spendAsset;
         uint256 spendAmount;
         address receiveAsset;
@@ -68,8 +69,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         address indexed sender,
         address indexed token,
         uint256 amount,
-        bytes recipient,
-        string task
+        bytes recipient
     );
 
     event Claimed(address indexed worker, bytes32 indexed taskId);
@@ -113,16 +113,16 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         bytes memory recipient,
         address worker,
         bytes32 taskId,
-        string memory task
+        bytes memory task
     ) external payable whenNotPaused nonReentrant {
         require(amount > 0, 'Zero transfer');
         require(recipient.length > 0, 'Illegal recipient data');
         require(worker != address(0), 'Illegal worker address');
         require(
-            bytes(_depositRecords[taskId].task).length == 0,
+            _depositRecords[taskId].task.length == 0,
             'Duplicate task'
         );
-        require(bytes(task).length > 0, 'Illegal task data');
+        require(task.length > 0, 'Illegal task data');
         require(
             _activedTasks[worker].length < WORKER_MAX_TASK_COUNT,
             'Too many tasks'
@@ -149,7 +149,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
             recipient: recipient,
             task: task
         });
-        emit Deposited(msg.sender, token, amount, recipient, task);
+        emit Deposited(msg.sender, token, amount, recipient);
     }
 
     // Drop task data and trigger asset beeing transfered back to task depositor
@@ -261,6 +261,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
                         for(uint j = 0; j < calli.updateLen; j++) {
                             calli.callData[j + calli.updateOffset] = settleAmountBytes[j];
                         }
+                        calli.spendAmount = settleAmount;
                     }
                 }
             }
@@ -276,7 +277,11 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
                 }
             }
 
-            // Execute
+            // Approve if necessary
+            if (calli.spendAsset != nativeAsset && calli.spender != address(0) && calli.spendAsset != address(0)) {
+                require(IERC20(calli.spendAsset).approve(calli.spender, calli.spendAmount), "Approve failed");
+            }
+            // Execute exact call
             (result.success, result.returnData) = calli.target.call{value: calli.value}(calli.callData);
             require(result.success, string(abi.encodePacked(string("Call failed: "), string(result.returnData))));
             unchecked {
@@ -304,7 +309,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         return depositInfo;
     }
 
-    function getLastActivedTask(address worker)
+    function getNextActivedTask(address worker)
         public
         view
         returns (bytes32)
