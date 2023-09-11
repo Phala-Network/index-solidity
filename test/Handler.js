@@ -32,7 +32,7 @@ describe('Handler', function () {
       to: test.address,
       value: '10000',
       gasLimit: 2000000,
-      gasPrice: 10000000000
+      gasPrice: 10000000000,
     })
 
     return {token, handler, owner, worker, user, tokenB, test}
@@ -134,21 +134,19 @@ describe('Handler', function () {
       )
 
       await expect(
-        handler
-          .connect(user)
-          .deposit(
-            // address(0), default represent native token
-            '0x0000000000000000000000000000000000000000',
-            '100',
-            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-            worker.address,
-            '0x0000000000000000000000000000000000000000000000000000000000000001',
-            '0x1234',
-            {
-              // Pay native token
-              value: '100',
-            }
-          )
+        handler.connect(user).deposit(
+          // address(0), default represent native token
+          '0x0000000000000000000000000000000000000000',
+          '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+          worker.address,
+          '0x0000000000000000000000000000000000000000000000000000000000000001',
+          '0x1234',
+          {
+            // Pay native token
+            value: '100',
+          }
+        )
       )
         .to.emit(handler, 'Deposited')
         .withArgs(
@@ -319,12 +317,6 @@ describe('Handler', function () {
         '0x0000000000000000000000000000000000000000000000000000000000000001'
       )
 
-      let gas = await handler.connect(worker).estimateGas.claim(
-        '0x0000000000000000000000000000000000000000000000000000000000000001'
-      )
-      // origin: 105285
-      console.log(`=====> claim gas cost: ${gas}`)
-
       await expect(
         handler
           .connect(worker)
@@ -350,20 +342,18 @@ describe('Handler', function () {
       await handler.setWorker(worker.address)
 
       await expect(
-        handler
-          .connect(user)
-          .deposit(
-            // address(0), default represent native token
-            '0x0000000000000000000000000000000000000000',
-            '100',
-            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-            worker.address,
-            '0x0000000000000000000000000000000000000000000000000000000000000001',
-            '0x1234',
-            {
-              value: '100',
-            }
-          )
+        handler.connect(user).deposit(
+          // address(0), default represent native token
+          '0x0000000000000000000000000000000000000000',
+          '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+          worker.address,
+          '0x0000000000000000000000000000000000000000000000000000000000000001',
+          '0x1234',
+          {
+            value: '100',
+          }
+        )
       )
         .to.emit(handler, 'Deposited')
         .withArgs(
@@ -488,20 +478,18 @@ describe('Handler', function () {
       await handler.setWorker(worker.address)
 
       await expect(
-        handler
-          .connect(user)
-          .deposit(
-            // address(0), default represent native token
-            '0x0000000000000000000000000000000000000000',
-            '100',
-            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-            worker.address,
-            '0x0000000000000000000000000000000000000000000000000000000000000001',
-            '0x1234',
-            {
-              value: '100'
-            }
-          )
+        handler.connect(user).deposit(
+          // address(0), default represent native token
+          '0x0000000000000000000000000000000000000000',
+          '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
+          worker.address,
+          '0x0000000000000000000000000000000000000000000000000000000000000001',
+          '0x1234',
+          {
+            value: '100',
+          }
+        )
       )
         .to.emit(handler, 'Deposited')
         .withArgs(
@@ -540,18 +528,18 @@ describe('Handler', function () {
         token.address,
         '400',
       ])
-      let callDataSwapTokenToTokenB = test.interface.encodeFunctionData('swap', [
-        token.address,
-        tokenB.address,
-        '10000',
-      ])
-      let callDataSwapTokenBToNative = test.interface.encodeFunctionData('swapToNative', [
-        tokenB.address,
-        '10000',
-      ])
-      let callDataSwapNativeToTokenB = test.interface.encodeFunctionData('swapNative', [
-        tokenB.address,
-      ])
+      let callDataSwapTokenToTokenB = test.interface.encodeFunctionData(
+        'swap',
+        [token.address, tokenB.address, '10000']
+      )
+      let callDataSwapTokenBToNative = test.interface.encodeFunctionData(
+        'swapToNative',
+        [tokenB.address, '10000']
+      )
+      let callDataSwapNativeToTokenB = test.interface.encodeFunctionData(
+        'swapNative',
+        [tokenB.address]
+      )
       let callDataDoNothing = test.interface.encodeFunctionData('doNothing', [
         '10000',
       ])
@@ -693,17 +681,9 @@ describe('Handler', function () {
           '6',
         ],
       ]
-      let gas = await handler.connect(worker).estimateGas.batchCall(arguments, {
-        value: '1',
-      })
-      // origin: 436489
-      // after remove approve: 383434
-      // after change call struct data type: 388482,
-      console.log(`=====> batchCall gas cost: ${gas}`)
       // Batch call
       await expect(
-        handler.connect(worker).batchCall(arguments,
-        {
+        handler.connect(worker).batchCall(arguments, {
           value: '1',
         })
       )

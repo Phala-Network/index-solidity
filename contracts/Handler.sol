@@ -60,6 +60,8 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     mapping(bytes32 => DepositInfo) public _depositRecords;
     // workerAddress => taskId[]
     mapping(address => bytes32[]) public _activedTasks;
+    // workerAddress => activedTaskIndex
+    mapping(address => uint) public _activedTaskIndexs;
     // workerAddress => isWorker
     mapping(address => bool) public _workers;
     // Address to represent the native asset, default is address(0)
@@ -124,7 +126,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         );
         require(task.length > 0, 'Illegal task data');
         require(
-            _activedTasks[worker].length < WORKER_MAX_TASK_COUNT,
+            (activedTaskCount(worker)) < WORKER_MAX_TASK_COUNT,
             'Too many tasks'
         );
 
@@ -314,9 +316,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         view
         returns (bytes32)
     {
-        bytes32[] memory tasks = _activedTasks[worker];
-        if (tasks.length > 0) return tasks[tasks.length - 1];
-        else return bytes32(0);
+        return nextActivedTask(worker);
     }
 
     function getActivedTasks(address worker)
@@ -324,7 +324,13 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         view
         returns (bytes32[] memory)
     {
-        return _activedTasks[worker];
+        bytes32[] memory tasks = _activedTasks[worker];
+        bytes32[] memory activedTasks = new bytes32[](activedTaskCount(worker));
+        uint currentIndex = _activedTaskIndexs[worker];
+        for (uint i = currentIndex; i < tasks.length; i++) {
+            activedTasks[i - currentIndex] = tasks[i];
+        }
+        return activedTasks;
     }
 
     function getTaskData(bytes32 taskId)
@@ -336,29 +342,23 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     }
 
     function removeTask(address worker, bytes32 taskId) internal {
-        bytes32[] memory tasks = _activedTasks[worker];
-        uint checkIndex = 0;
-        for (; checkIndex < tasks.length; checkIndex++) {
-            if (taskId == tasks[checkIndex]) break;
-        }
-        // Task not found
-        if (checkIndex >= tasks.length) return;
+        require(nextActivedTask(worker) == taskId, "Task not actived");
 
-        // If tasks has more than 1 item, we should keep remaining items
-        if (tasks.length == 1) {
-            _activedTasks[worker] = new bytes32[](0);
+        // Simplly increase the index
+        _activedTaskIndexs[worker] += 1;
+    }
+
+    function nextActivedTask(address worker) internal view returns (bytes32) {
+        bytes32[] memory task = _activedTasks[worker];
+        uint nextIndex = _activedTaskIndexs[worker];
+        if (task.length > nextIndex) {
+            return task[nextIndex];
         } else {
-            bytes32[] memory remainingTasks = new bytes32[](tasks.length - 1);
-            for (uint i = 0; i < tasks.length; i++) {
-                if (i < checkIndex) {
-                    remainingTasks[i] = tasks[i];
-                } else {
-                    // Shift
-                    remainingTasks[i - 1] = tasks[i];
-                }
-            }
-            // Assign remain tasks to storage
-            _activedTasks[worker] = remainingTasks;
+            return bytes32(0);
         }
+    }
+
+    function activedTaskCount(address worker) internal view returns (uint) {
+        return _activedTasks[worker].length.sub(_activedTaskIndexs[worker]);
     }
 }
