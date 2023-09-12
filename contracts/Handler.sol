@@ -208,7 +208,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         DepositInfo memory depositInfo = this.findActivedTask(msg.sender, taskId);
         // Check if task is exist
         require(depositInfo.sender != address(0), "Task does not exist");
-        require(calls.length > 1, 'Too few calls');
+        require(calls.length >= 1, 'Too few calls');
 
         // Check first call
         require(calls[0].spendAsset == address(depositInfo.token), "spendAsset mismatch");
@@ -230,7 +230,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     function _batchCall(Call[] calldata calls) internal returns (Result[] memory returnData) {
     
         uint256 length = calls.length;
-        require(length > 1, 'Too few calls');
+        require(length >= 1, 'Too few calls');
 
         // Check spendAsset
         require(
