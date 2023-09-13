@@ -232,13 +232,6 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         uint256 length = calls.length;
         require(length >= 1, 'Too few calls');
 
-        // Check spendAsset
-        require(
-            IERC20(calls[0].spendAsset).balanceOf(self) >=
-                calls[0].spendAmount,
-            'Insufficient balance'
-        );
-
         returnData = new Result[](length);
         uint256 [] memory settleAmounts = new uint256[](calls.length);
 
