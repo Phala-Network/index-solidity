@@ -46,27 +46,10 @@ describe('Handler', function () {
         handler.deposit(
           '0x0000000000000000000000000000000000000001',
           '0',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
           worker.address,
           '0x0000000000000000000000000000000000000000000000000000000000000001',
-          '0x1234'
         )
       ).to.be.revertedWith('Zero transfer')
-    })
-
-    it('Should revert if recipient is empty', async function () {
-      const {handler, worker} = await loadFixture(deployHandlerFixture)
-
-      await expect(
-        handler.deposit(
-          '0x0000000000000000000000000000000000000001',
-          '100',
-          '0x',
-          worker.address,
-          '0x0000000000000000000000000000000000000000000000000000000000000001',
-          '0x1234'
-        )
-      ).to.be.revertedWith('Illegal recipient data')
     })
 
     it('Should revert if worker address is 0', async function () {
@@ -76,27 +59,10 @@ describe('Handler', function () {
         handler.deposit(
           '0x0000000000000000000000000000000000000001',
           '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
           '0x0000000000000000000000000000000000000000',
           '0x0000000000000000000000000000000000000000000000000000000000000001',
-          '0x1234'
         )
       ).to.be.revertedWith('Illegal worker address')
-    })
-
-    it('Should revert if task data is empty', async function () {
-      const {handler, worker} = await loadFixture(deployHandlerFixture)
-
-      await expect(
-        handler.deposit(
-          '0x0000000000000000000000000000000000000001',
-          '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
-          worker.address,
-          '0x0000000000000000000000000000000000000000000000000000000000000001',
-          '0x'
-        )
-      ).to.be.revertedWith('Illegal task data')
     })
 
     it('Deposit should work', async function () {
@@ -105,7 +71,17 @@ describe('Handler', function () {
       )
 
       // User approve to handler
-      token.connect(user).approve(handler.address, '10000')
+      await token.connect(user).approve(handler.address, '10000')
+
+      let depositGas = await handler.connect(user).estimateGas.deposit(
+        token.address,
+        '100',
+        worker.address,
+        '0x0000000000000000000000000000000000000000000000000000000000000001',
+      )
+
+      // 903008/245638/198002  ----> 106885
+      console.log(`=====> deposit gas cost: ${depositGas}`)
 
       await expect(
         handler
@@ -113,10 +89,8 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
-            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
-            '0x1234'
           )
       )
         .to.emit(handler, 'Deposited')
@@ -124,7 +98,6 @@ describe('Handler', function () {
           user.address,
           token.address,
           '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d'
         )
     })
 
@@ -138,10 +111,8 @@ describe('Handler', function () {
           // address(0), default represent native token
           '0x0000000000000000000000000000000000000000',
           '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
           worker.address,
           '0x0000000000000000000000000000000000000000000000000000000000000001',
-          '0x1234',
           {
             // Pay native token
             value: '100',
@@ -153,7 +124,6 @@ describe('Handler', function () {
           user.address,
           '0x0000000000000000000000000000000000000000',
           '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d'
         )
     })
 
@@ -171,10 +141,8 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
-            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
-            '0x1234'
           )
       )
         .to.emit(handler, 'Deposited')
@@ -182,7 +150,6 @@ describe('Handler', function () {
           user.address,
           token.address,
           '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d'
         )
 
       await expect(
@@ -191,10 +158,8 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
-            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
-            '0x1234'
           )
       ).to.be.revertedWith('Duplicate task')
     })
@@ -214,10 +179,8 @@ describe('Handler', function () {
             .deposit(
               token.address,
               '100',
-              '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
               worker.address,
               ethers.utils.hexZeroPad(i, 32),
-              '0x1234'
             )
         )
           .to.emit(handler, 'Deposited')
@@ -225,7 +188,6 @@ describe('Handler', function () {
             user.address,
             token.address,
             '100',
-            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d'
           )
       }
 
@@ -235,10 +197,8 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
-            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000010',
-            '0x1234'
           )
       ).to.be.revertedWith('Too many tasks')
     })
@@ -261,10 +221,8 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
-            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
-            '0x1234'
           )
       )
         .to.emit(handler, 'Deposited')
@@ -272,7 +230,6 @@ describe('Handler', function () {
           user.address,
           token.address,
           '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d'
         )
 
       await expect(
@@ -299,10 +256,8 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
-            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
-            '0x1234'
           )
       )
         .to.emit(handler, 'Deposited')
@@ -310,7 +265,6 @@ describe('Handler', function () {
           user.address,
           token.address,
           '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d'
         )
 
       expect(await handler.getNextActivedTask(worker.address)).to.equal(
@@ -346,10 +300,8 @@ describe('Handler', function () {
           // address(0), default represent native token
           '0x0000000000000000000000000000000000000000',
           '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
           worker.address,
           '0x0000000000000000000000000000000000000000000000000000000000000001',
-          '0x1234',
           {
             value: '100',
           }
@@ -360,7 +312,6 @@ describe('Handler', function () {
           user.address,
           '0x0000000000000000000000000000000000000000',
           '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d'
         )
 
       await expect(
@@ -395,10 +346,8 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
-            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
-            '0x1234'
           )
       )
         .to.emit(handler, 'Deposited')
@@ -406,7 +355,6 @@ describe('Handler', function () {
           user.address,
           token.address,
           '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d'
         )
 
       await expect(
@@ -433,10 +381,8 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
-            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
-            '0x1234'
           )
       )
         .to.emit(handler, 'Deposited')
@@ -444,7 +390,6 @@ describe('Handler', function () {
           user.address,
           token.address,
           '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d'
         )
 
       expect(await handler.getNextActivedTask(worker.address)).to.equal(
@@ -482,10 +427,8 @@ describe('Handler', function () {
           // address(0), default represent native token
           '0x0000000000000000000000000000000000000000',
           '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
           worker.address,
           '0x0000000000000000000000000000000000000000000000000000000000000001',
-          '0x1234',
           {
             value: '100',
           }
@@ -496,7 +439,6 @@ describe('Handler', function () {
           user.address,
           '0x0000000000000000000000000000000000000000',
           '100',
-          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d'
         )
 
       await expect(
@@ -553,7 +495,7 @@ describe('Handler', function () {
       // Transfer some token to handler
       token.connect(owner).transfer(handler.address, '500')
 
-      let arguments = [
+      let calls = [
         [
           test.address,
           callDataDoNothing,
@@ -561,16 +503,16 @@ describe('Handler', function () {
 
           false,
           // No need to update at first call
-          '0',
-          '0',
+          0,
+          0,
           '0x0000000000000000000000000000000000000000',
           token.address,
           // We don't need to spend any asset because we do claim that will be sent asset
           '0',
           token.address,
           // Will be ingored because this is the first call
-          '0',
-          '0',
+          0,
+          0,
         ],
         // Test -> Handler: 400 TT
         [
@@ -580,16 +522,16 @@ describe('Handler', function () {
 
           true,
           // No need to update at first call
-          '0',
-          '0',
+          0,
+          0,
           '0x0000000000000000000000000000000000000000',
           token.address,
           // We don't need to spend any asset because we do claim that will be sent asset
           '0',
           token.address,
           // Will be ingored because this is the first call
-          '0',
-          '1',
+          0,
+          1,
         ],
         // Handler -> Test: 400 TT
         // Test -> Handler: 200 TTB
@@ -599,15 +541,15 @@ describe('Handler', function () {
           '0',
 
           true,
-          '68',
-          '32',
+          68,
+          32,
           test.address,
           token.address,
           '10000',
           tokenB.address,
           // Use the claim  call output as input
-          '1',
-          '2',
+          1,
+          2,
         ],
         // Do nothing
         [
@@ -616,15 +558,15 @@ describe('Handler', function () {
           '0',
 
           false,
-          '4',
-          '32',
+          4,
+          32,
           '0x0000000000000000000000000000000000000000',
           tokenB.address,
           '10000',
           tokenB.address,
           // Use the swap call output as input
-          '2',
-          '3',
+          2,
+          3,
         ],
         // TokenB (200) -> Native (100)
         [
@@ -634,15 +576,15 @@ describe('Handler', function () {
           '0',
 
           true,
-          '36',
-          '32',
+          36,
+          32,
           test.address,
           tokenB.address,
           '100',
           '0x0000000000000000000000000000000000000000',
           // User first swap output as input
-          '2',
-          '4',
+          2,
+          4,
         ],
         // Native (100) -> TokenB (200)
         [
@@ -652,15 +594,15 @@ describe('Handler', function () {
           '10000',
 
           true,
-          '0',
-          '0',
+          0,
+          0,
           '0x0000000000000000000000000000000000000000',
           '0x0000000000000000000000000000000000000000',
           '100',
           tokenB.address,
           // Use last call as input
-          '4',
-          '5',
+          4,
+          5,
         ],
         // Handler -> Test: 100 TTB
         [
@@ -670,20 +612,73 @@ describe('Handler', function () {
 
           // No need to settle on last call
           false,
-          '36',
-          '32',
+          36,
+          32,
           test.address,
           tokenB.address,
           '10000',
           tokenB.address,
           // Still use the swap call output as input
-          '5',
-          '6',
+          5,
+          6,
         ],
       ]
+
+      function encodeCall(intputCalls) {
+        let rawCalls = ethers.utils.hexlify(intputCalls.length)
+        for (let i = 0; i <  intputCalls.length; i++) {
+          let call = intputCalls[i]
+          console.log(call)
+
+          // target
+          rawCalls += call[0].slice(2)
+          // calldata length
+          rawCalls += ethers.utils.hexZeroPad(ethers.utils.hexlify(call[1].slice(2).length / 2), 2).slice(2)
+          // calldata
+          rawCalls += call[1].slice(2)
+          // value
+          rawCalls += ethers.utils.hexZeroPad(ethers.BigNumber.from(call[2]).toHexString(), 32).slice(2)
+          // needSettle
+          rawCalls += call[3] == 1 ? '01' : '00'
+          // updateOffset
+          rawCalls += ethers.utils.hexZeroPad(ethers.utils.hexlify(call[4]), 2).slice(2)
+          // updateLen
+          rawCalls += ethers.utils.hexZeroPad(ethers.utils.hexlify(call[5]), 2).slice(2)
+          // spender
+          rawCalls += call[6].slice(2)
+          // spendAsset
+          rawCalls += call[7].slice(2)
+          // spendAmount
+          rawCalls += ethers.utils.hexZeroPad(ethers.BigNumber.from(call[8]).toHexString(), 32).slice(2)
+          // receiveAsset
+          rawCalls += call[9].slice(2)
+          // inputCall
+          rawCalls += ethers.utils.hexlify(call[10]).slice(2)
+          // callIndex
+          rawCalls += ethers.utils.hexlify(call[11]).slice(2)
+          break
+        }
+
+        return rawCalls
+      }
+
+      let rawCalls = encodeCall(calls)
+      console.log(`rawCalls: ${rawCalls}`)
+      return
+      let batchCallGas = await handler.connect(worker).estimateGas.batchCall(rawCalls, {
+        value: '1',
+      })
+
+      // 971,988|380342 / 422879 / 422819
+      // Uniswap (1 swaps inside) calldata length: 200 bytes
+      // inDEX batchCall (6 swaps inside) calldata length: 3000 bytes
+      // inDEX Call struct can be optimized to 100 bytes, so every swap would be 300 bytes
+      // thus 6 swaps could be 1800 bytes
+      console.log(`=====> batchCall gas cost: ${batchCallGas}`)
+
       // Batch call
       await expect(
-        handler.connect(worker).batchCall(arguments, {
+        handler.connect(worker).batchCall(rawCalls, {
           value: '1',
         })
       )
