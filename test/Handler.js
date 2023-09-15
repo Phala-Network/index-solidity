@@ -46,10 +46,25 @@ describe('Handler', function () {
         handler.deposit(
           '0x0000000000000000000000000000000000000001',
           '0',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
           worker.address,
           '0x0000000000000000000000000000000000000000000000000000000000000001',
         )
       ).to.be.revertedWith('Zero transfer')
+    })
+
+    it('Should revert if recipient is empty', async function () {
+      const {handler, worker} = await loadFixture(deployHandlerFixture)
+
+      await expect(
+        handler.deposit(
+          '0x0000000000000000000000000000000000000001',
+          '100',
+          '0x',
+          worker.address,
+          '0x0000000000000000000000000000000000000000000000000000000000000001',
+        )
+      ).to.be.revertedWith('Illegal recipient data')
     })
 
     it('Should revert if worker address is 0', async function () {
@@ -59,6 +74,7 @@ describe('Handler', function () {
         handler.deposit(
           '0x0000000000000000000000000000000000000001',
           '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
           '0x0000000000000000000000000000000000000000',
           '0x0000000000000000000000000000000000000000000000000000000000000001',
         )
@@ -76,6 +92,7 @@ describe('Handler', function () {
       let depositGas = await handler.connect(user).estimateGas.deposit(
         token.address,
         '100',
+        '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
         worker.address,
         '0x0000000000000000000000000000000000000000000000000000000000000001',
       )
@@ -89,6 +106,7 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
           )
@@ -98,6 +116,7 @@ describe('Handler', function () {
           user.address,
           token.address,
           '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
         )
     })
 
@@ -111,6 +130,7 @@ describe('Handler', function () {
           // address(0), default represent native token
           '0x0000000000000000000000000000000000000000',
           '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
           worker.address,
           '0x0000000000000000000000000000000000000000000000000000000000000001',
           {
@@ -124,6 +144,7 @@ describe('Handler', function () {
           user.address,
           '0x0000000000000000000000000000000000000000',
           '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
         )
     })
 
@@ -141,6 +162,7 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
           )
@@ -150,6 +172,7 @@ describe('Handler', function () {
           user.address,
           token.address,
           '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
         )
 
       await expect(
@@ -158,6 +181,7 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
           )
@@ -179,6 +203,7 @@ describe('Handler', function () {
             .deposit(
               token.address,
               '100',
+              '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
               worker.address,
               ethers.utils.hexZeroPad(i, 32),
             )
@@ -188,6 +213,7 @@ describe('Handler', function () {
             user.address,
             token.address,
             '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
           )
       }
 
@@ -197,6 +223,7 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000010',
           )
@@ -221,6 +248,7 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
           )
@@ -230,6 +258,7 @@ describe('Handler', function () {
           user.address,
           token.address,
           '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
         )
 
       await expect(
@@ -256,6 +285,7 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
           )
@@ -265,6 +295,7 @@ describe('Handler', function () {
           user.address,
           token.address,
           '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
         )
 
       expect(await handler.getNextActivedTask(worker.address)).to.equal(
@@ -300,6 +331,7 @@ describe('Handler', function () {
           // address(0), default represent native token
           '0x0000000000000000000000000000000000000000',
           '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
           worker.address,
           '0x0000000000000000000000000000000000000000000000000000000000000001',
           {
@@ -312,6 +344,7 @@ describe('Handler', function () {
           user.address,
           '0x0000000000000000000000000000000000000000',
           '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
         )
 
       await expect(
@@ -346,6 +379,7 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
           )
@@ -355,6 +389,7 @@ describe('Handler', function () {
           user.address,
           token.address,
           '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
         )
 
       await expect(
@@ -381,6 +416,7 @@ describe('Handler', function () {
           .deposit(
             token.address,
             '100',
+            '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
             worker.address,
             '0x0000000000000000000000000000000000000000000000000000000000000001',
           )
@@ -390,6 +426,7 @@ describe('Handler', function () {
           user.address,
           token.address,
           '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
         )
 
       expect(await handler.getNextActivedTask(worker.address)).to.equal(
@@ -427,6 +464,7 @@ describe('Handler', function () {
           // address(0), default represent native token
           '0x0000000000000000000000000000000000000000',
           '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
           worker.address,
           '0x0000000000000000000000000000000000000000000000000000000000000001',
           {
@@ -439,6 +477,7 @@ describe('Handler', function () {
           user.address,
           '0x0000000000000000000000000000000000000000',
           '100',
+          '0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d',
         )
 
       await expect(
@@ -628,8 +667,6 @@ describe('Handler', function () {
         let rawCalls = ethers.utils.hexlify(intputCalls.length)
         for (let i = 0; i <  intputCalls.length; i++) {
           let call = intputCalls[i]
-          console.log(call)
-
           // target
           rawCalls += call[0].slice(2)
           // calldata length
@@ -656,15 +693,12 @@ describe('Handler', function () {
           rawCalls += ethers.utils.hexlify(call[10]).slice(2)
           // callIndex
           rawCalls += ethers.utils.hexlify(call[11]).slice(2)
-          break
         }
 
         return rawCalls
       }
 
       let rawCalls = encodeCall(calls)
-      console.log(`rawCalls: ${rawCalls}`)
-      return
       let batchCallGas = await handler.connect(worker).estimateGas.batchCall(rawCalls, {
         value: '1',
       })

@@ -25,6 +25,8 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         address sender;
         // Deposit token
         address token;
+        // Recipient address on dest chain
+        bytes recipient;
         // Deposit amount
         uint256 amount;
     }
@@ -68,7 +70,8 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     event Deposited(
         address indexed sender,
         address indexed token,
-        uint256 amount
+        uint256 amount,
+        bytes recipient
     );
 
     event Claimed(address indexed worker, bytes32 indexed taskId);
@@ -109,10 +112,12 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     function deposit(
         address token,
         uint256 amount,
+        bytes memory recipient,
         address worker,
         bytes32 taskId
     ) external payable whenNotPaused nonReentrant {
         require(amount > 0, 'Zero transfer');
+        require(recipient.length > 0, 'Illegal recipient data');
         require(worker != address(0), 'Illegal worker address');
         require(
             _depositRecords[taskId].amount == 0,
@@ -140,9 +145,10 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         _depositRecords[taskId] = DepositInfo({
             sender: msg.sender,
             token: token,
+            recipient: recipient,
             amount: amount
         });
-        emit Deposited(msg.sender, token, amount);
+        emit Deposited(msg.sender, token, amount, recipient);
     }
 
     // Drop task data and trigger asset beeing transfered back to task depositor
