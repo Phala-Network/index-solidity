@@ -542,16 +542,16 @@ describe('Handler', function () {
 
           false,
           // No need to update at first call
-          0,
-          0,
+          '0',
+          '0',
           '0x0000000000000000000000000000000000000000',
           token.address,
           // We don't need to spend any asset because we do claim that will be sent asset
           '0',
           token.address,
           // Will be ingored because this is the first call
-          0,
-          0,
+          '0',
+          '0',
         ],
         // Test -> Handler: 400 TT
         [
@@ -561,16 +561,16 @@ describe('Handler', function () {
 
           true,
           // No need to update at first call
-          0,
-          0,
+          '0',
+          '0',
           '0x0000000000000000000000000000000000000000',
           token.address,
           // We don't need to spend any asset because we do claim that will be sent asset
           '0',
           token.address,
           // Will be ingored because this is the first call
-          0,
-          1,
+          '0',
+          '1',
         ],
         // Handler -> Test: 400 TT
         // Test -> Handler: 200 TTB
@@ -580,15 +580,15 @@ describe('Handler', function () {
           '0',
 
           true,
-          68,
-          32,
+          '68',
+          '32',
           test.address,
           token.address,
           '10000',
           tokenB.address,
           // Use the claim  call output as input
-          1,
-          2,
+          '1',
+          '2',
         ],
         // Do nothing
         [
@@ -597,15 +597,15 @@ describe('Handler', function () {
           '0',
 
           false,
-          4,
-          32,
+          '4',
+          '32',
           '0x0000000000000000000000000000000000000000',
           tokenB.address,
           '10000',
           tokenB.address,
           // Use the swap call output as input
-          2,
-          3,
+          '2',
+          '3',
         ],
         // TokenB (200) -> Native (100)
         [
@@ -615,15 +615,15 @@ describe('Handler', function () {
           '0',
 
           true,
-          36,
-          32,
+          '36',
+          '32',
           test.address,
           tokenB.address,
           '100',
           '0x0000000000000000000000000000000000000000',
           // User first swap output as input
-          2,
-          4,
+          '2',
+          '4',
         ],
         // Native (100) -> TokenB (200)
         [
@@ -633,15 +633,15 @@ describe('Handler', function () {
           '10000',
 
           true,
-          0,
-          0,
+          '0',
+          '0',
           '0x0000000000000000000000000000000000000000',
           '0x0000000000000000000000000000000000000000',
           '100',
           tokenB.address,
           // Use last call as input
-          4,
-          5,
+          '4',
+          '5',
         ],
         // Handler -> Test: 100 TTB
         [
@@ -651,55 +651,19 @@ describe('Handler', function () {
 
           // No need to settle on last call
           false,
-          36,
-          32,
+          '36',
+          '32',
           test.address,
           tokenB.address,
           '10000',
           tokenB.address,
           // Still use the swap call output as input
-          5,
-          6,
+          '5',
+          '6',
         ],
       ]
 
-      function encodeCall(intputCalls) {
-        let rawCalls = ethers.utils.hexlify(intputCalls.length)
-        for (let i = 0; i <  intputCalls.length; i++) {
-          let call = intputCalls[i]
-          // target
-          rawCalls += call[0].slice(2)
-          // calldata length
-          rawCalls += ethers.utils.hexZeroPad(ethers.utils.hexlify(call[1].slice(2).length / 2), 2).slice(2)
-          // calldata
-          rawCalls += call[1].slice(2)
-          // value
-          rawCalls += ethers.utils.hexZeroPad(ethers.BigNumber.from(call[2]).toHexString(), 32).slice(2)
-          // needSettle
-          rawCalls += call[3] == 1 ? '01' : '00'
-          // updateOffset
-          rawCalls += ethers.utils.hexZeroPad(ethers.utils.hexlify(call[4]), 2).slice(2)
-          // updateLen
-          rawCalls += ethers.utils.hexZeroPad(ethers.utils.hexlify(call[5]), 2).slice(2)
-          // spender
-          rawCalls += call[6].slice(2)
-          // spendAsset
-          rawCalls += call[7].slice(2)
-          // spendAmount
-          rawCalls += ethers.utils.hexZeroPad(ethers.BigNumber.from(call[8]).toHexString(), 32).slice(2)
-          // receiveAsset
-          rawCalls += call[9].slice(2)
-          // inputCall
-          rawCalls += ethers.utils.hexlify(call[10]).slice(2)
-          // callIndex
-          rawCalls += ethers.utils.hexlify(call[11]).slice(2)
-        }
-
-        return rawCalls
-      }
-
-      let rawCalls = encodeCall(calls)
-      let batchCallGas = await handler.connect(worker).estimateGas.batchCall(rawCalls, {
+      let batchCallGas = await handler.connect(worker).estimateGas.batchCall(calls, {
         value: '1',
       })
 
@@ -712,7 +676,7 @@ describe('Handler', function () {
 
       // Batch call
       await expect(
-        handler.connect(worker).batchCall(rawCalls, {
+        handler.connect(worker).batchCall(calls, {
           value: '1',
         })
       )

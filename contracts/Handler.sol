@@ -9,12 +9,10 @@ import '@openzeppelin/contracts/security/Pausable.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/math/SafeMath.sol';
-import "solidity-bytes-utils/contracts/BytesLib.sol";
 
 contract Handler is ReentrancyGuard, Ownable, Pausable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
-    using BytesLib for bytes;
 
     address self;
 
@@ -39,16 +37,16 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
 
         // The settlement metadata
         bool needSettle;
-        uint16 updateOffset;
-        uint16 updateLen;
+        uint256 updateOffset;
+        uint256 updateLen;
         address spender;
         address spendAsset;
         uint256 spendAmount;
         address receiveAsset;
         // The call index that whose result will be the input of call
-        uint8 inputCall;
+        uint256 inputCall;
         // Current call index
-        uint8 callIndex;
+        uint256 callIndex;
     }
 
     struct Result {
@@ -201,12 +199,10 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         emit Claimed(msg.sender, taskId);
     }
 
-    function claimAndBatchCall(bytes32 taskId, bytes calldata raw) external payable whenNotPaused onlyWorker nonReentrant {
+    function claimAndBatchCall(bytes32 taskId, Call[] calldata calls) external payable whenNotPaused onlyWorker nonReentrant {
         DepositInfo memory depositInfo = this.findActivedTask(msg.sender, taskId);
         // Check if task is exist
         require(depositInfo.sender != address(0), "Task does not exist");
-
-        Call[] memory calls = decodeCalls(raw);
         require(calls.length >= 1, 'Too few calls');
 
         // Check first call
@@ -222,12 +218,11 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     }
 
     // Worker execute a bunch of calls, make sure handler already hodld enough spendAsset of first call
-    function batchCall(bytes calldata raw) external payable whenNotPaused onlyWorker nonReentrant {
-        Call[] memory calls = decodeCalls(raw);
+    function batchCall(Call[] calldata calls) external payable whenNotPaused onlyWorker nonReentrant {
         _batchCall(calls);
     }
 
-    function _batchCall(Call[] memory calls) internal returns (Result[] memory returnData) {
+    function _batchCall(Call[] calldata calls) internal returns (Result[] memory returnData) {
         uint256 length = calls.length;
         require(length >= 1, 'Too few calls');
         returnData = new Result[](length);
@@ -351,51 +346,5 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
 
     function activedTaskCount(address worker) internal view returns (uint) {
         return _activedTasks[worker].length.sub(_activedTaskIndexs[worker]);
-    }
-
-    // 1 bytes: number of calls
-    // loops:
-    //   20 bytes: target
-    //   2  bytes: calldata length
-    //   n  bytes: calldata
-    //   32 bytes: value
-    //   1  bytes: needSettle
-    //   2  bytes: updateOffset
-    //   2  bytes: updateLen
-    //   20 bytes: spender
-    //   20 bytes: spendAsset
-    //   32 bytes: spendAmount
-    //   20 bytes: receiveAsset
-    //   1  bytes: inputCall
-    //   1  bytes: callIndex
-    function decodeCalls(bytes calldata raw) internal pure returns (Call[] memory) {
-        uint length = raw.toUint8(0);
-        Call[] memory calls = new Call[](length);
-        // First call start offset
-        uint callStartOffset = 1;
-        uint callDataLen;
-        uint callStructSize;
-        for (uint i = 0; i < length; i++) {
-            callDataLen = raw.toUint16(callStartOffset + 20);
-            callStructSize = callDataLen + (20 + 2 + 32 + 1 + 2 + 2 + 20 + 20 + 32 + 20 + 1 + 1);
-            bytes memory callBytes = raw.slice(callStartOffset, callStructSize);
-            calls[i] = Call ({
-                target: callBytes.toAddress(0),
-                callData: callBytes.slice(20 + 2, callDataLen),
-                value: callBytes.toUint256(20 + 2 + callDataLen),
-
-                needSettle: callBytes.toUint8(20 + 2 + callDataLen + 32) == 1,
-                updateOffset: callBytes.toUint16(20 + 2 + callDataLen + 32 + 1),
-                updateLen: callBytes.toUint16(20 + 2 + callDataLen + 32 + 1 + 2),
-                spender: callBytes.toAddress(20 + 2 + callDataLen + 32 + 1 + 2 + 2),
-                spendAsset: callBytes.toAddress(20 + 2 + callDataLen + 32 + 1 + 2 + 2 + 20),
-                spendAmount: callBytes.toUint256(20 + 2 + callDataLen + 32 + 1 + 2 + 2 + 20 + 20),
-                receiveAsset: callBytes.toAddress(20 + 2 + callDataLen + 32 + 1 + 2 + 2 + 20 + 20 + 32),
-                inputCall: callBytes.toUint8(20 + 2 + callDataLen + 32 + 1 + 2 + 2 + 20 + 20 + 32 + 20),
-                callIndex: callBytes.toUint8(20 + 2 + callDataLen + 32 + 1 + 2 + 2 + 20 + 20 + 32 + 20 + 1)
-            });
-            callStartOffset = callStartOffset + callStructSize;
-        }
-        return calls;
     }
 }

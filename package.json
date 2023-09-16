@@ -33,7 +33,6 @@
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.8.0",
-    "dotenv": "^16.0.3",
-    "solidity-bytes-utils": "^0.8.0"
+    "dotenv": "^16.0.3"
   }
 }
