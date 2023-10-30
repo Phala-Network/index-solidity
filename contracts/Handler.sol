@@ -23,12 +23,10 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         address sender;
         // Deposit token
         address token;
-        // Deposit amount
-        uint256 amount;
         // Recipient address on dest chain
         bytes recipient;
-        // Encoded execution plan produced by Solver
-        string task;
+        // Deposit amount
+        uint256 amount;
     }
 
     struct Call {
@@ -41,6 +39,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         bool needSettle;
         uint256 updateOffset;
         uint256 updateLen;
+        address spender;
         address spendAsset;
         uint256 spendAmount;
         address receiveAsset;
@@ -59,6 +58,8 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     mapping(bytes32 => DepositInfo) public _depositRecords;
     // workerAddress => taskId[]
     mapping(address => bytes32[]) public _activedTasks;
+    // workerAddress => activedTaskIndex
+    mapping(address => uint) public _activedTaskIndexs;
     // workerAddress => isWorker
     mapping(address => bool) public _workers;
     // Address to represent the native asset, default is address(0)
@@ -68,8 +69,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         address indexed sender,
         address indexed token,
         uint256 amount,
-        bytes recipient,
-        string task
+        bytes recipient
     );
 
     event Claimed(address indexed worker, bytes32 indexed taskId);
@@ -112,19 +112,17 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         uint256 amount,
         bytes memory recipient,
         address worker,
-        bytes32 taskId,
-        string memory task
+        bytes32 taskId
     ) external payable whenNotPaused nonReentrant {
         require(amount > 0, 'Zero transfer');
         require(recipient.length > 0, 'Illegal recipient data');
         require(worker != address(0), 'Illegal worker address');
         require(
-            bytes(_depositRecords[taskId].task).length == 0,
+            _depositRecords[taskId].amount == 0,
             'Duplicate task'
         );
-        require(bytes(task).length > 0, 'Illegal task data');
         require(
-            _activedTasks[worker].length < WORKER_MAX_TASK_COUNT,
+            (activedTaskCount(worker)) < WORKER_MAX_TASK_COUNT,
             'Too many tasks'
         );
 
@@ -145,11 +143,10 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         _depositRecords[taskId] = DepositInfo({
             sender: msg.sender,
             token: token,
-            amount: amount,
             recipient: recipient,
-            task: task
+            amount: amount
         });
-        emit Deposited(msg.sender, token, amount, recipient, task);
+        emit Deposited(msg.sender, token, amount, recipient);
     }
 
     // Drop task data and trigger asset beeing transfered back to task depositor
@@ -206,7 +203,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         DepositInfo memory depositInfo = this.findActivedTask(msg.sender, taskId);
         // Check if task is exist
         require(depositInfo.sender != address(0), "Task does not exist");
-        require(calls.length > 1, 'Too few calls');
+        require(calls.length >= 1, 'Too few calls');
 
         // Check first call
         require(calls[0].spendAsset == address(depositInfo.token), "spendAsset mismatch");
@@ -226,17 +223,8 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     }
 
     function _batchCall(Call[] calldata calls) internal returns (Result[] memory returnData) {
-    
         uint256 length = calls.length;
-        require(length > 1, 'Too few calls');
-
-        // Check spendAsset
-        require(
-            IERC20(calls[0].spendAsset).balanceOf(self) >=
-                calls[0].spendAmount,
-            'Insufficient balance'
-        );
-
+        require(length >= 1, 'Too few calls');
         returnData = new Result[](length);
         uint256 [] memory settleAmounts = new uint256[](calls.length);
 
@@ -261,6 +249,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
                         for(uint j = 0; j < calli.updateLen; j++) {
                             calli.callData[j + calli.updateOffset] = settleAmountBytes[j];
                         }
+                        calli.spendAmount = settleAmount;
                     }
                 }
             }
@@ -276,7 +265,11 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
                 }
             }
 
-            // Execute
+            // Approve if necessary
+            if (calli.spendAsset != nativeAsset && calli.spender != address(0) && calli.spendAsset != address(0)) {
+                require(IERC20(calli.spendAsset).approve(calli.spender, calli.spendAmount), "Approve failed");
+            }
+            // Execute exact call
             (result.success, result.returnData) = calli.target.call{value: calli.value}(calli.callData);
             require(result.success, string(abi.encodePacked(string("Call failed: "), string(result.returnData))));
             unchecked {
@@ -304,14 +297,12 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         return depositInfo;
     }
 
-    function getLastActivedTask(address worker)
+    function getNextActivedTask(address worker)
         public
         view
         returns (bytes32)
     {
-        bytes32[] memory tasks = _activedTasks[worker];
-        if (tasks.length > 0) return tasks[tasks.length - 1];
-        else return bytes32(0);
+        return nextActivedTask(worker);
     }
 
     function getActivedTasks(address worker)
@@ -319,7 +310,13 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         view
         returns (bytes32[] memory)
     {
-        return _activedTasks[worker];
+        bytes32[] memory tasks = _activedTasks[worker];
+        bytes32[] memory activedTasks = new bytes32[](activedTaskCount(worker));
+        uint currentIndex = _activedTaskIndexs[worker];
+        for (uint i = currentIndex; i < tasks.length; i++) {
+            activedTasks[i - currentIndex] = tasks[i];
+        }
+        return activedTasks;
     }
 
     function getTaskData(bytes32 taskId)
@@ -331,29 +328,23 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     }
 
     function removeTask(address worker, bytes32 taskId) internal {
-        bytes32[] memory tasks = _activedTasks[worker];
-        uint checkIndex = 0;
-        for (; checkIndex < tasks.length; checkIndex++) {
-            if (taskId == tasks[checkIndex]) break;
-        }
-        // Task not found
-        if (checkIndex >= tasks.length) return;
+        require(nextActivedTask(worker) == taskId, "Task not actived");
 
-        // If tasks has more than 1 item, we should keep remaining items
-        if (tasks.length == 1) {
-            _activedTasks[worker] = new bytes32[](0);
+        // Simplly increase the index
+        _activedTaskIndexs[worker] += 1;
+    }
+
+    function nextActivedTask(address worker) internal view returns (bytes32) {
+        bytes32[] memory task = _activedTasks[worker];
+        uint nextIndex = _activedTaskIndexs[worker];
+        if (task.length > nextIndex) {
+            return task[nextIndex];
         } else {
-            bytes32[] memory remainingTasks = new bytes32[](tasks.length - 1);
-            for (uint i = 0; i < tasks.length; i++) {
-                if (i < checkIndex) {
-                    remainingTasks[i] = tasks[i];
-                } else {
-                    // Shift
-                    remainingTasks[i - 1] = tasks[i];
-                }
-            }
-            // Assign remain tasks to storage
-            _activedTasks[worker] = remainingTasks;
+            return bytes32(0);
         }
+    }
+
+    function activedTaskCount(address worker) internal view returns (uint) {
+        return _activedTasks[worker].length.sub(_activedTaskIndexs[worker]);
     }
 }
