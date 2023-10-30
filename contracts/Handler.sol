@@ -87,6 +87,14 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
 
     receive() external payable  {}
 
+    function pause() public onlyOwner() {
+        _pause();
+    }
+
+    function unpause() public onlyOwner() {
+        _unpause();
+    }
+
     function setMultiWorkers(address[] memory workers) external onlyOwner {
         require(workers.length < 100, 'Too many workers');
         for (uint i = 0; i < workers.length; i++) {
