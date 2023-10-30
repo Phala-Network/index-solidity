@@ -22,7 +22,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         // Sender address on source chain
         address sender;
         // Deposit token
-        IERC20 token;
+        address token;
         // Deposit amount
         uint256 amount;
         // Recipient address on dest chain
@@ -61,6 +61,8 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     mapping(address => bytes32[]) public _activedTasks;
     // workerAddress => isWorker
     mapping(address => bool) public _workers;
+    // Address to represent the native asset, default is address(0)
+    address public nativeAsset = address(0);
 
     event Deposited(
         address indexed sender,
@@ -83,6 +85,8 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         self = address(this);
     }
 
+    receive() external payable  {}
+
     function setMultiWorkers(address[] memory workers) external onlyOwner {
         require(workers.length < 100, 'Too many workers');
         for (uint i = 0; i < workers.length; i++) {
@@ -98,6 +102,10 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         _workers[worker] = false;
     }
 
+    function setNative(address native) external onlyOwner {
+        nativeAsset = native;
+    }
+
     // Temporary transfer asset to contract and save the corresponding task data
     function deposit(
         address token,
@@ -106,8 +114,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         address worker,
         bytes32 taskId,
         string memory task
-    ) external whenNotPaused nonReentrant {
-        require(token != address(0), 'Illegal token address');
+    ) external payable whenNotPaused nonReentrant {
         require(amount > 0, 'Zero transfer');
         require(recipient.length > 0, 'Illegal recipient data');
         require(worker != address(0), 'Illegal worker address');
@@ -121,11 +128,15 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
             'Too many tasks'
         );
 
-        uint256 preBalance = IERC20(token).balanceOf(self);
-        // Transfer from sender to contract
-        IERC20(token).safeTransferFrom(msg.sender, self, amount);
-        uint256 postBalance = IERC20(token).balanceOf(self);
-        require(postBalance.sub(preBalance) == amount, 'Transfer failed');
+        if (token == nativeAsset) {
+            require(msg.value == amount, 'Mismatch in transfer amount');
+        } else {
+            uint256 preBalance = IERC20(token).balanceOf(self);
+            // Transfer from sender to contract
+            IERC20(token).safeTransferFrom(msg.sender, self, amount);
+            uint256 postBalance = IERC20(token).balanceOf(self);
+            require(postBalance.sub(preBalance) == amount, 'Transfer failed');
+        }
 
         // Put task id to actived task list
         bytes32[] storage tasks = _activedTasks[worker];
@@ -133,7 +144,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         // Save task details
         _depositRecords[taskId] = DepositInfo({
             sender: msg.sender,
-            token: IERC20(token),
+            token: token,
             amount: amount,
             recipient: recipient,
             task: task
@@ -151,12 +162,17 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         removeTask(msg.sender, taskId);
 
         // Transfer asset back to task depositor account
-        require(
-            depositInfo.token.balanceOf(self) >=
-                depositInfo.amount,
-            'Insufficient balance'
-        );
-        depositInfo.token.safeTransfer(depositInfo.sender, depositInfo.amount);
+        if (depositInfo.token == nativeAsset) {
+            (bool sent, bytes memory _data) = depositInfo.sender.call{value: depositInfo.amount}("");
+            require(sent, "Failed to send Ether");
+        } else {
+            require(
+                IERC20(depositInfo.token).balanceOf(self) >=
+                    depositInfo.amount,
+                'Insufficient balance'
+            );
+            IERC20(depositInfo.token).safeTransfer(depositInfo.sender, depositInfo.amount);
+        }
 
         emit Dropped(msg.sender, taskId);
     }
@@ -171,17 +187,22 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         removeTask(msg.sender, taskId);
 
         // Transfer asset to worker account
-        require(
-            depositInfo.token.balanceOf(self) >=
-                depositInfo.amount,
-            'Insufficient balance'
-        );
-        depositInfo.token.safeTransfer(msg.sender, depositInfo.amount);
+        if (depositInfo.token == nativeAsset) {
+            (bool sent, bytes memory _data) = msg.sender.call{value: depositInfo.amount}("");
+            require(sent, "Failed to send Ether");
+        } else {
+            require(
+                IERC20(depositInfo.token).balanceOf(self) >=
+                    depositInfo.amount,
+                'Insufficient balance'
+            );
+            IERC20(depositInfo.token).safeTransfer(msg.sender, depositInfo.amount);
+        }
 
         emit Claimed(msg.sender, taskId);
     }
 
-    function claimAndBatchCall(bytes32 taskId, Call[] calldata calls) external whenNotPaused onlyWorker nonReentrant {
+    function claimAndBatchCall(bytes32 taskId, Call[] calldata calls) external payable whenNotPaused onlyWorker nonReentrant {
         DepositInfo memory depositInfo = this.findActivedTask(msg.sender, taskId);
         // Check if task is exist
         require(depositInfo.sender != address(0), "Task does not exist");
@@ -200,7 +221,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     }
 
     // Worker execute a bunch of calls, make sure handler already hodld enough spendAsset of first call
-    function batchCall(Call[] calldata calls) external whenNotPaused onlyWorker nonReentrant {
+    function batchCall(Call[] calldata calls) external payable whenNotPaused onlyWorker nonReentrant {
         _batchCall(calls);
     }
 
@@ -220,7 +241,6 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         uint256 [] memory settleAmounts = new uint256[](calls.length);
 
         for (uint256 i = 0; i < length;) {
-            // console.log("===> Start execute call: ", i);
             Result memory result = returnData[i];
             Call memory calli = calls[i];
 
@@ -231,18 +251,17 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
                 if (inputCall.needSettle && calli.spendAsset == inputCall.receiveAsset) {
                     // Update settleAmount to calldata from offset
                     uint256 settleAmount = settleAmounts[inputCall.callIndex];
-                    // console.log("===> Update settleAmount to calldata from offset: ", settleAmount);
                     require(settleAmount > 0, 'Settle amount must be greater than 0');
-                    require(calli.updateLen == 32, 'Unsupported update length');
-                    bytes memory settleAmountBytes = abi.encodePacked(settleAmount);
+                    if (calli.spendAsset == nativeAsset) {
+                        calli.value = settleAmount;
+                    } else {
+                        require(calli.updateLen == 32, 'Unsupported update length');
+                        bytes memory settleAmountBytes = abi.encodePacked(settleAmount);
 
-                    // console.log("===> Calldata before update: ");
-                    // console.logBytes(calli.callData);
-                    for(uint j = 0; j < calli.updateLen; j++) {
-                        calli.callData[j + calli.updateOffset] = settleAmountBytes[j];
+                        for(uint j = 0; j < calli.updateLen; j++) {
+                            calli.callData[j + calli.updateOffset] = settleAmountBytes[j];
+                        }
                     }
-                    // console.log("===> Calldata after update: ");
-                    // console.logBytes(calli.callData);
                 }
             }
 
@@ -250,23 +269,28 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
             uint256 postBalance;
             // Read balance before execution
             if (calli.needSettle) {
-                preBalance = IERC20(calli.receiveAsset).balanceOf(self);
+                if (calli.receiveAsset == nativeAsset) {
+                    preBalance = self.balance;
+                } else {
+                    preBalance = IERC20(calli.receiveAsset).balanceOf(self);
+                }
             }
 
-            // console.log("===> Ready to execute call");
             // Execute
-            (result.success, result.returnData) = calli.target.call(calli.callData);
-            // console.log("===> Execute result: ", result.success);
-            // console.log("===> Return data:");
-            // console.logBytes(result.returnData);
+            (result.success, result.returnData) = calli.target.call{value: calli.value}(calli.callData);
             require(result.success, string(abi.encodePacked(string("Call failed: "), string(result.returnData))));
-            unchecked { ++i; }
+            unchecked {
+                ++i;
+            }
 
             // Settle balance after execution
             if (calli.needSettle) {
-                postBalance = IERC20(calli.receiveAsset).balanceOf(self);
+                if (calli.receiveAsset == nativeAsset) {
+                    postBalance = self.balance;
+                } else {
+                    postBalance = IERC20(calli.receiveAsset).balanceOf(self);
+                }
                 settleAmounts[calli.callIndex] = postBalance.sub(preBalance);
-                // console.log("===> Call", calli.callIndex, "been settled: ", settleAmounts[calli.callIndex]);
             }
         }
     }
