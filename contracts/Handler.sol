@@ -31,6 +31,30 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         string task;
     }
 
+    struct Call {
+        // The call metadata
+        address target;
+        bytes callData;
+        uint256 value;
+
+        // The settlement metadata
+        bool needSettle;
+        uint256 updateOffset;
+        uint256 updateLen;
+        address spendAsset;
+        uint256 spendAmount;
+        address receiveAsset;
+        // The call index that whose result will be the input of call
+        uint256 inputCall;
+        // Current call index
+        uint256 callIndex;
+    }
+
+    struct Result {
+        bool success;
+        bytes returnData;
+    }
+
     // taskId => DepositInfo
     mapping(bytes32 => DepositInfo) public _depositRecords;
     // workerAddress => taskId[]
@@ -47,6 +71,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     );
 
     event Claimed(address indexed worker, bytes32 indexed taskId);
+    event ClaimedAndExecuted(address indexed worker, bytes32 indexed taskId);
     event Dropped(address indexed worker, bytes32 indexed taskId);
 
     modifier onlyWorker() {
@@ -156,24 +181,94 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         emit Claimed(msg.sender, taskId);
     }
 
-    // Worker claim all actived tasks that belong to this worker
-    function claimAll() external whenNotPaused onlyWorker nonReentrant {
-        bytes32[] memory tasks = _activedTasks[msg.sender];
-        for (uint256 i = 0; i < tasks.length; i++) {
-            DepositInfo memory depositInfo = _depositRecords[tasks[i]];
-            require(
-                depositInfo.token.balanceOf(self) >=
-                    depositInfo.amount,
-                'Insufficient balance'
-            );
-            // Transfer asset to worker account
-            depositInfo.token.safeTransfer(msg.sender, depositInfo.amount);
+    function claimAndBatchCall(bytes32 taskId, Call[] calldata calls) external whenNotPaused onlyWorker nonReentrant {
+        DepositInfo memory depositInfo = this.findActivedTask(msg.sender, taskId);
+        // Check if task is exist
+        require(depositInfo.sender != address(0), "Task does not exist");
+        require(calls.length > 1, 'Too few calls');
 
-            emit Claimed(msg.sender, tasks[i]);
+        // Check first call
+        require(calls[0].spendAsset == address(depositInfo.token), "spendAsset mismatch");
+        require(calls[0].spendAmount == depositInfo.amount, "spendAmount mismatch");
+
+        _batchCall(calls);
+
+        // Remove task
+        removeTask(msg.sender, taskId);
+
+        emit Claimed(msg.sender, taskId);
+    }
+
+    // Worker execute a bunch of calls, make sure handler already hodld enough spendAsset of first call
+    function batchCall(Call[] calldata calls) external whenNotPaused onlyWorker nonReentrant {
+        _batchCall(calls);
+    }
+
+    function _batchCall(Call[] calldata calls) internal returns (Result[] memory returnData) {
+    
+        uint256 length = calls.length;
+        require(length > 1, 'Too few calls');
+
+        // Check spendAsset
+        require(
+            IERC20(calls[0].spendAsset).balanceOf(self) >=
+                calls[0].spendAmount,
+            'Insufficient balance'
+        );
+
+        returnData = new Result[](length);
+        uint256 [] memory settleAmounts = new uint256[](calls.length);
+
+        for (uint256 i = 0; i < length;) {
+            // console.log("===> Start execute call: ", i);
+            Result memory result = returnData[i];
+            Call memory calli = calls[i];
+
+            // update calldata from second call
+            if (i > 0) {
+                Call memory inputCall = calls[calli.inputCall];
+
+                if (inputCall.needSettle && calli.spendAsset == inputCall.receiveAsset) {
+                    // Update settleAmount to calldata from offset
+                    uint256 settleAmount = settleAmounts[inputCall.callIndex];
+                    // console.log("===> Update settleAmount to calldata from offset: ", settleAmount);
+                    require(settleAmount > 0, 'Settle amount must be greater than 0');
+                    require(calli.updateLen == 32, 'Unsupported update length');
+                    bytes memory settleAmountBytes = abi.encodePacked(settleAmount);
+
+                    // console.log("===> Calldata before update: ");
+                    // console.logBytes(calli.callData);
+                    for(uint j = 0; j < calli.updateLen; j++) {
+                        calli.callData[j + calli.updateOffset] = settleAmountBytes[j];
+                    }
+                    // console.log("===> Calldata after update: ");
+                    // console.logBytes(calli.callData);
+                }
+            }
+
+            uint256 preBalance;
+            uint256 postBalance;
+            // Read balance before execution
+            if (calli.needSettle) {
+                preBalance = IERC20(calli.receiveAsset).balanceOf(self);
+            }
+
+            // console.log("===> Ready to execute call");
+            // Execute
+            (result.success, result.returnData) = calli.target.call(calli.callData);
+            // console.log("===> Execute result: ", result.success);
+            // console.log("===> Return data:");
+            // console.logBytes(result.returnData);
+            require(result.success, string(abi.encodePacked(string("Call failed: "), string(result.returnData))));
+            unchecked { ++i; }
+
+            // Settle balance after execution
+            if (calli.needSettle) {
+                postBalance = IERC20(calli.receiveAsset).balanceOf(self);
+                settleAmounts[calli.callIndex] = postBalance.sub(preBalance);
+                // console.log("===> Call", calli.callIndex, "been settled: ", settleAmounts[calli.callIndex]);
+            }
         }
-
-        // Clear actived tasks list
-        delete _activedTasks[msg.sender];
     }
 
     function findActivedTask(address worker, bytes32 taskId) public view returns (DepositInfo memory depositInfo) {
