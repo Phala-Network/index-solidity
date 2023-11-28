@@ -174,17 +174,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         removeTask(msg.sender, taskId);
 
         // Transfer asset back to task depositor account
-        if (depositInfo.token == nativeAsset) {
-            (bool sent, bytes memory _data) = depositInfo.sender.call{value: depositInfo.amount}("");
-            require(sent, "Failed to send Ether");
-        } else {
-            require(
-                IERC20(depositInfo.token).balanceOf(self) >=
-                    depositInfo.amount,
-                'Insufficient balance'
-            );
-            IERC20(depositInfo.token).safeTransfer(depositInfo.sender, depositInfo.amount);
-        }
+        _transfer(depositInfo.token, depositInfo.sender, depositInfo.amount);
 
         emit Dropped(msg.sender, taskId);
     }
@@ -199,17 +189,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         removeTask(msg.sender, taskId);
 
         // Transfer asset to worker account
-        if (depositInfo.token == nativeAsset) {
-            (bool sent, bytes memory _data) = msg.sender.call{value: depositInfo.amount}("");
-            require(sent, "Failed to send Ether");
-        } else {
-            require(
-                IERC20(depositInfo.token).balanceOf(self) >=
-                    depositInfo.amount,
-                'Insufficient balance'
-            );
-            IERC20(depositInfo.token).safeTransfer(msg.sender, depositInfo.amount);
-        }
+        _transfer(depositInfo.token, msg.sender, depositInfo.amount);
 
         emit Claimed(msg.sender, taskId);
     }
@@ -247,14 +227,10 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         address spendAsset = calls[0].spendAsset;
         if (spendAsset == nativeAsset) {
             require(self.balance > spend, "insufficient native asset to spend");
-            // Transfer native asset from worker to this contract
-            (bool sent, bytes memory _data) = address(this).call{value: spend}("");
-            require(sent, "Failed to send Ether");
         } else {
             require(IERC20(spendAsset).balanceOf(msg.sender) >= spend, "insufficient asset to spend");
-            // Transfer ERC20 asset from worker to this contract
-            IERC20(IERC20(spendAsset)).safeTransfer(address(this), spend);
         }
+        _transfer(spendAsset, address(this), spend);
 
         _batchCall(calls);
     }
