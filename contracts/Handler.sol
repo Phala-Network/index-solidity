@@ -226,11 +226,13 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         uint256 spend = calls[0].spendAmount;
         address spendAsset = calls[0].spendAsset;
         if (spendAsset == nativeAsset) {
-            require(self.balance > spend, "insufficient native asset to spend");
+            require(msg.value == spend, "Spend amount mismatch");
+            // No native asset already transferred to contract from worker account
         } else {
-            require(IERC20(spendAsset).balanceOf(msg.sender) >= spend, "insufficient asset to spend");
+            require(IERC20(spendAsset).balanceOf(msg.sender) >= spend, "Insufficient asset to spend");
+            // Make sure worker has enough approvement
+            IERC20(spendAsset).safeTransferFrom(msg.sender, self, spend);
         }
-        _transfer(spendAsset, address(this), spend);
 
         _batchCall(calls);
     }
