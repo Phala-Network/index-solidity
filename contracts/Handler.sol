@@ -15,6 +15,7 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
     using SafeERC20 for IERC20;
 
     address self;
+    address public feeAccount;
 
     uint256 private constant WORKER_MAX_TASK_COUNT = 10;
 
@@ -83,6 +84,8 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
 
     constructor() {
         self = address(this);
+        // By default
+        feeAccount = address(this);
     }
 
     receive() external payable  {}
@@ -93,6 +96,10 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
 
     function unpause() public onlyOwner() {
         _unpause();
+    }
+
+    function setFeeAccount(address _feeAccount) public onlyOwner() {
+        feeAccount = _feeAccount;
     }
 
     function setMultiWorkers(address[] memory workers) external onlyOwner {
@@ -207,15 +214,23 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         emit Claimed(msg.sender, taskId);
     }
 
-    function claimAndBatchCall(bytes32 taskId, Call[] calldata calls) external payable whenNotPaused onlyWorker nonReentrant {
+    function claimAndBatchCall(bytes32 taskId, uint256 fee, Call[] calldata calls) external payable whenNotPaused onlyWorker nonReentrant {
         DepositInfo memory depositInfo = this.findActivedTask(msg.sender, taskId);
         // Check if task is exist
         require(depositInfo.sender != address(0), "Task does not exist");
         require(calls.length >= 1, 'Too few calls');
 
+        uint256 spend = calls[0].spendAmount;
+        address spendAsset = calls[0].spendAsset;
         // Check first call
-        require(calls[0].spendAsset == address(depositInfo.token), "spendAsset mismatch");
-        require(calls[0].spendAmount == depositInfo.amount, "spendAmount mismatch");
+        require(spendAsset == address(depositInfo.token), "spendAsset mismatch");
+        // We calculated fee in executor, spend amount of first call puls fee should equal
+        // to the origin deposit amount
+        require(spend + fee == depositInfo.amount, "spendAmount mismatch");
+        // Transfer fee to fee collection account
+        if (feeAccount != address(this)) {
+            _transfer(spendAsset, feeAccount, fee);
+        }
 
         _batchCall(calls);
 
@@ -309,6 +324,15 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
                 }
                 settleAmounts[calli.callIndex] = postBalance.sub(preBalance);
             }
+        }
+    }
+
+    function _transfer(address asset, address recipient, uint256 amount) private {
+        if (asset == nativeAsset) {
+            (bool sent, bytes memory _data) = recipient.call{value: amount}("");
+            require(sent, "Failed to send Ether");
+        } else {
+            IERC20(IERC20(asset)).safeTransfer(recipient, amount);
         }
     }
 
