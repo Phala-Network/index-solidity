@@ -225,8 +225,22 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         emit Claimed(msg.sender, taskId);
     }
 
-    // Worker execute a bunch of calls, make sure handler already hodld enough spendAsset of first call
+    // Worker execute a bunch of calls, we assume worker already hold enough spendAsset of first call
     function batchCall(Call[] calldata calls) external payable whenNotPaused onlyWorker nonReentrant {
+        require(calls.length >= 1, 'Too few calls');
+        uint256 spend = calls[0].spendAmount;
+        address spendAsset = calls[0].spendAsset;
+        if (spendAsset == nativeAsset) {
+            require(self.balance > spend, "insufficient native asset to spend");
+            // Transfer native asset from worker to this contract
+            (bool sent, bytes memory _data) = address(this).call{value: spend}("");
+            require(sent, "Failed to send Ether");
+        } else {
+            require(IERC20(spendAsset).balanceOf(msg.sender) >= spend, "insufficient asset to spend");
+            // Transfer ERC20 asset from worker to this contract
+            IERC20(IERC20(spendAsset)).safeTransfer(address(this), spend);
+        }
+
         _batchCall(calls);
     }
 
