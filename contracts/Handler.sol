@@ -254,6 +254,8 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
             Result memory result = returnData[i];
             Call memory calli = calls[i];
 
+            // Call this contract indirectly is not allowed
+            require(calli.target != address(this), 'Illegal target');
             // update calldata from second call
             if (i > 0) {
                 Call memory inputCall = calls[calli.inputCall];
