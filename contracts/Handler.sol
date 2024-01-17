@@ -121,6 +121,11 @@ contract Handler is ReentrancyGuard, Ownable, Pausable {
         nativeAsset = native;
     }
 
+    // Admin withdraw asset from the contract, for migration purpose only
+    function withdraw(address token, address recipient, uint256 amount) external onlyOwner {
+        _transfer(token, recipient, amount);
+    }
+
     // Temporary transfer asset to contract and save the corresponding task data
     function deposit(
         address token,
